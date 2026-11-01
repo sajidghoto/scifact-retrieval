@@ -5,3 +5,6 @@ sqlalchemy>=2.0
 psycopg[binary]
 alembic
 pydantic-settings
+pgvector
+python-dotenv
+pytest
