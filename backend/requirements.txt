@@ -8,3 +8,5 @@ pydantic-settings
 pgvector
 python-dotenv
 pytest
+sentence-transformers
+numpy

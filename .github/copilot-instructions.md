@@ -8,9 +8,11 @@ Keep this file as concise, current project memory. At the end of work that mater
 - Backend: FastAPI health endpoint at `backend/app/main.py`; SQLAlchemy models for documents, chunks, queries, and qrels are in `backend/app/db/models.py`.
 - Data: local SciFact corpus, queries, and qrels are under `data/raw/scifact/`.
 - Ingestion: `scripts/ingest/ingest_scifact.py` was verified against the local and fresh databases: 5,183 documents, 6,274 chunks, 1,109 queries, and 339 test qrels. Integrity checks and rerun idempotency passed.
-- Frontend: Next.js search UI connected to the locally verified `/search` and `/stats` endpoints. Embeddings are not implemented.
+- Frontend: Next.js search UI connected to the locally verified `/search` and `/stats` endpoints.
+- Embeddings: `scripts/embed/embed_chunks.py` uses local `BAAI/bge-base-en-v1.5` vectors with dimension 768; supports `--limit`, `--dry-run`, and `--batch-size`.
+- Colab embedding path exists in `notebooks/colab_embed.ipynb`; full embedding/import remains pending.
 - Tests: chunking and BM25 unit tests are in `tests/test_chunking.py` and `tests/test_baseline.py`.
-- Migration `0638444e2212` includes the nullable `chunks.embedding` pgvector column defined by the model. The local and fresh databases were upgraded and verified at this revision.
+- Migration `9b2c3d4e5f6a` aligns `chunks.embedding` to pgvector dimension 768 and clears prior embeddings.
 - BM25 baseline measured 5,183 documents, 300 queries, 339 relevant_pairs, recall@10 0.784, recall@100 0.883, mrr@10 0.630, ndcg@10 0.662.
 
 ## Decisions
@@ -22,9 +24,8 @@ Keep this file as concise, current project memory. At the end of work that mater
 
 ## Next steps
 
-1. Choose one hosted embedding model and match `chunks.embedding` dimension.
-2. Embed chunks idempotently.
-3. Implement a vector retriever and retriever-agnostic evaluation.
+1. Implement a vector retriever.
+2. Implement retriever-agnostic evaluation.
 
 ## Useful commands
 

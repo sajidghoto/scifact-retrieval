@@ -67,6 +67,33 @@ qrels, and upserts them and their chunks in a single transaction. It can be
 rerun safely. The verification script performs read-only integrity checks and
 exits non-zero if any check fails.
 
+Embed pending chunks locally with `BAAI/bge-base-en-v1.5` (768 dimensions).
+The command is resumable and commits each batch independently:
+
+```powershell
+python .\scripts\embed\embed_chunks.py --dry-run
+python .\scripts\embed\embed_chunks.py --limit 20
+```
+
+Use `--batch-size N` to override the configured batch size. The local model
+has no API cost; the estimate excludes local compute costs.
+
+## Colab embedding workflow
+
+1. Export every stored chunk without changing its text:
+   `python .\scripts\embed\export_chunks.py`.
+2. Upload the generated `chunks.parquet` (or `chunks.jsonl` when pyarrow is
+   unavailable) and `chunks.meta.json` to
+   [notebooks/colab_embed.ipynb](notebooks/colab_embed.ipynb), select a Colab
+   T4 runtime, and run every cell. The notebook verifies both checksums,
+   preserves text exactly, embeds with `BAAI/bge-base-en-v1.5`, and downloads
+   `embeddings.npy`, `ids.npy`, and `embeddings_meta.json`.
+3. Copy those three files to a local directory and validate/import them:
+   `python .\scripts\embed\import_embeddings.py --embeddings .\embeddings.npy --ids .\ids.npy --metadata .\embeddings_meta.json --dry-run`
+   then omit `--dry-run` to write only previously empty rows.
+4. Run the read-only parity check:
+   `python .\scripts\embed\parity_check.py`.
+
 Start the frontend in a separate terminal:
 
 ```bash

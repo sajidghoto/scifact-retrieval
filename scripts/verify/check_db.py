@@ -105,6 +105,45 @@ def main() -> int:
                 WHERE embedding IS NOT NULL
                 """,
             )
+            unembedded_chunks = _scalar(
+                connection,
+                """
+                SELECT count(*)
+                FROM chunks
+                WHERE embedding IS NULL
+                """,
+            )
+            embedding_models = [
+                row[0]
+                for row in connection.execute(
+                    text(
+                        """
+                        SELECT DISTINCT embedding_model
+                        FROM chunks
+                        WHERE embedding IS NOT NULL
+                        ORDER BY embedding_model
+                        """
+                    )
+                )
+            ]
+            wrong_dimension = _scalar(
+                connection,
+                """
+                SELECT count(*)
+                FROM chunks
+                WHERE embedding IS NOT NULL
+                  AND vector_dims(embedding) <> 768
+                """,
+            )
+            non_finite = _scalar(
+                connection,
+                """
+                SELECT count(*)
+                FROM chunks
+                WHERE embedding IS NOT NULL
+                  AND embedding::text ~ '(NaN|Infinity)'
+                """,
+            )
     finally:
         engine.dispose()
 
@@ -120,6 +159,10 @@ def main() -> int:
         f"share with 2+={distribution[4]:.6f}"
     )
     print(f"Chunks with non-null embedding: {embedded_chunks}")
+    print(f"Chunks with null embedding: {unembedded_chunks}")
+    print(f"Embedding models: {embedding_models}")
+    print(f"Embeddings with wrong dimension: {wrong_dimension}")
+    print(f"Embeddings with non-finite values: {non_finite}")
 
     failures = {
         "orphan chunks": orphan_chunks,
@@ -127,8 +170,12 @@ def main() -> int:
         "documents with zero chunks": zero_chunk_documents,
         "duplicate pairs": duplicate_pairs,
         "empty chunk text": empty_chunk_text,
+        "embeddings with wrong dimension": wrong_dimension,
+        "embeddings with non-finite values": non_finite,
     }
     failed_checks = [name for name, count in failures.items() if count]
+    if len(embedding_models) > 1:
+        failed_checks.append("multiple embedding models")
     if failed_checks:
         print("Integrity checks failed: " + ", ".join(failed_checks))
         return 1

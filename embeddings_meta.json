@@ -1,0 +1,12 @@
+{
+  "model": "BAAI/bge-base-en-v1.5",
+  "dimension": 768,
+  "device": "cuda",
+  "dtype": "float32",
+  "batch_size": 64,
+  "chunks_over_512_tokens": 40,
+  "elapsed_seconds": 167.13905681899996,
+  "torch_version": "2.11.0+cu130",
+  "sentence_transformers_version": "5.7.0",
+  "count": 6274
+}
