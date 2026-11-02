@@ -24,6 +24,7 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"bm25" | "vector">("bm25");
 
   useEffect(() => {
     fetch(`${apiUrl}/stats`)
@@ -43,7 +44,7 @@ export default function Home() {
     setError("");
     try {
       const response = await fetch(
-        `${apiUrl}/search?query=${encodeURIComponent(query.trim())}&limit=10`,
+        `${apiUrl}/search?query=${encodeURIComponent(query.trim())}&limit=10&mode=${mode}`,
       );
       const payload = (await response.json()) as
         | { results: SearchResult[] }
@@ -95,6 +96,18 @@ export default function Home() {
             {loading ? "Searching..." : "Search"}
           </button>
         </form>
+        <label className="flex items-center gap-2 text-sm text-gray-600" htmlFor="mode">
+          Retrieval mode
+          <select
+            className="rounded border border-gray-300 bg-white px-2 py-1 text-gray-900"
+            id="mode"
+            onChange={(event) => setMode(event.target.value as "bm25" | "vector")}
+            value={mode}
+          >
+            <option value="bm25">BM25</option>
+            <option value="vector">Vector</option>
+          </select>
+        </label>
         {stats && (
           <p className="text-sm text-gray-500">
             {stats.documents.toLocaleString()} documents ·{" "}

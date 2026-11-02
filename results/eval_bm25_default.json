@@ -1,0 +1,24 @@
+{
+  "config": {
+    "retriever": "bm25",
+    "model": null,
+    "dimension": null,
+    "chunk_size": 256,
+    "chunk_overlap": 64,
+    "query_prefix": null,
+    "aggregation": null,
+    "date": "2026-11-02T18:21:59.190837+00:00"
+  },
+  "metrics": {
+    "queries": 300,
+    "relevant_pairs": 339,
+    "recall@10": 0.7842777777777777,
+    "recall@100": 0.8825555555555555,
+    "mrr@10": 0.6302433862433862,
+    "ndcg@10": 0.6622130253683588
+  },
+  "latency_ms": {
+    "p50": 21.825449999596458,
+    "p95": 55.751385000985465
+  }
+}

@@ -11,7 +11,10 @@ Keep this file as concise, current project memory. At the end of work that mater
 - Frontend: Next.js search UI connected to the locally verified `/search` and `/stats` endpoints.
 - Embeddings: `scripts/embed/embed_chunks.py` uses local `BAAI/bge-base-en-v1.5` vectors with dimension 768; supports `--limit`, `--dry-run`, and `--batch-size`.
 - Colab embedding path exists in `notebooks/colab_embed.ipynb`; full embedding/import remains pending.
-- Tests: chunking and BM25 unit tests are in `tests/test_chunking.py` and `tests/test_baseline.py`.
+- Vector retriever and retriever-agnostic evaluation are implemented and measured: prefix vector recall@10 0.8780, recall@100 0.9683, MRR@10 0.7016, nDCG@10 0.7405; no-prefix recall@10 0.8619, recall@100 0.9733, MRR@10 0.7088, nDCG@10 0.7430.
+- Tests: 34 tests pass, including API failure handling, chunking, BM25, embedding, metrics, and vector retrieval tests.
+- API vector mode loads the model lazily once per process; model and database failures are logged with specific 503 details.
+- Evaluation reports contain separate query-embedding, DB-search, and total latency p50/p95 values; the README table reflects those fields.
 - Migration `9b2c3d4e5f6a` aligns `chunks.embedding` to pgvector dimension 768 and clears prior embeddings.
 - BM25 baseline measured 5,183 documents, 300 queries, 339 relevant_pairs, recall@10 0.784, recall@100 0.883, mrr@10 0.630, ndcg@10 0.662.
 
@@ -24,8 +27,7 @@ Keep this file as concise, current project memory. At the end of work that mater
 
 ## Next steps
 
-1. Implement a vector retriever.
-2. Implement retriever-agnostic evaluation.
+1. Add hybrid retrieval as the next retrieval step.
 
 ## Useful commands
 
@@ -38,6 +40,9 @@ docker compose exec db psql -U scifact -d scifact -c "CREATE EXTENSION IF NOT EX
 alembic -c backend\alembic.ini upgrade head
 python .\scripts\ingest\ingest_scifact.py
 uvicorn app.main:app --app-dir backend --reload
+python .\scripts\eval\run_eval.py --retriever bm25
+python .\scripts\eval\run_eval.py --retriever vector
+python .\scripts\eval\run_eval.py --retriever vector --no-query-prefix
 ```
 
 See `readme.md` for the development setup and project overview.

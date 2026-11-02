@@ -1,6 +1,11 @@
 
 import os
-from typing import Annotated
+import logging
+from pathlib import Path
+import sys
+from threading import Lock
+import time
+from typing import Annotated, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -12,6 +17,13 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Chunk, Document
 from app.retrieval import BM25, DocumentRecord
+from app.vector_retrieval import VectorRetriever
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT_DIR))
+logger = logging.getLogger(__name__)
+_vector_embedder = None
+_vector_embedder_lock = Lock()
 
 load_dotenv()
 
@@ -51,6 +63,7 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     query: str
+    mode: str
     results: list[SearchResult]
 
 
@@ -70,6 +83,23 @@ def database_session():
 
 
 DatabaseSession = Annotated[Session, Depends(database_session)]
+
+
+def _get_vector_embedder(model: str):
+    global _vector_embedder
+    if _vector_embedder is None:
+        with _vector_embedder_lock:
+            if _vector_embedder is None:
+                from scripts.eval.run_eval import SentenceTransformerQueryEmbedder
+
+                started = time.perf_counter()
+                _vector_embedder = SentenceTransformerQueryEmbedder(model)
+                logger.info(
+                    "Loaded vector model %s in %.3f seconds",
+                    model,
+                    time.perf_counter() - started,
+                )
+    return _vector_embedder
 
 
 @app.get("/health", tags=["Health"])
@@ -97,8 +127,52 @@ def search_documents(
     session: DatabaseSession,
     query: Annotated[str, Query(min_length=1, max_length=500)],
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    mode: Annotated[Literal["bm25", "vector"], Query()] = "bm25",
 ) -> SearchResponse:
-    """Search the ingested corpus with the deterministic BM25 baseline."""
+    """Search the ingested corpus with BM25 or exact vector retrieval."""
+    if mode == "vector":
+        try:
+            from scripts.embed.config import EmbeddingConfig
+
+            config = EmbeddingConfig.from_environment()
+            embedder = _get_vector_embedder(config.model)
+            retriever = VectorRetriever(
+                session,
+                embedder,
+            )
+            scores = dict(retriever.search(query, limit))
+            documents = list(
+                session.scalars(
+                    select(Document).where(Document.doc_id.in_(scores))
+                )
+            )
+            result_by_id = {document.doc_id: document for document in documents}
+            return SearchResponse(
+                query=query,
+                mode=mode,
+                results=[
+                    SearchResult(
+                        doc_id=doc_id,
+                        title=result_by_id[doc_id].title,
+                        text=result_by_id[doc_id].text,
+                        score=score,
+                    )
+                    for doc_id, score in scores.items()
+                    if doc_id in result_by_id
+                ],
+            )
+        except (ImportError, OSError, RuntimeError, ValueError) as error:
+            logger.exception("Vector model or dependency failure: %s", error)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Vector model or dependency unavailable: {error}",
+            ) from error
+        except SQLAlchemyError as error:
+            logger.exception("Vector retrieval database failure: %s", error)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Vector retrieval database unavailable: {error}",
+            ) from error
     try:
         documents = list(session.scalars(select(Document).order_by(Document.doc_id)))
     except SQLAlchemyError as error:
@@ -128,4 +202,4 @@ def search_documents(
         )
         for doc_id, score in scores.items()
     ]
-    return SearchResponse(query=query, results=results)
+    return SearchResponse(query=query, mode=mode, results=results)

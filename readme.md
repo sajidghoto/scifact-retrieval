@@ -78,6 +78,58 @@ python .\scripts\embed\embed_chunks.py --limit 20
 Use `--batch-size N` to override the configured batch size. The local model
 has no API cost; the estimate excludes local compute costs.
 
+## Retriever evaluation
+
+Run the retriever-agnostic evaluation on the 300 qrel-backed test queries:
+
+```powershell
+python .\scripts\eval\run_eval.py --retriever bm25
+python .\scripts\eval\run_eval.py --retriever vector
+python .\scripts\eval\run_eval.py --retriever vector --no-query-prefix
+```
+
+Vector retrieval uses exact pgvector cosine search over chunks, fetches up to
+the full embedded corpus until at least 100 distinct documents are available,
+and aggregates each document by its maximum chunk similarity. Query text uses
+the BGE model-card prefix
+[`Represent this sentence for searching relevant passages:`](https://huggingface.co/BAAI/bge-base-en-v1.5#using-sentence-transformers)
+only for vector queries; stored chunk text is unchanged. The commands write
+summary and per-query JSON files under `results/`.
+
+Measured on the local SciFact database with `BAAI/bge-base-en-v1.5`:
+
+| Retriever | Recall@10 | Recall@100 | MRR@10 | nDCG@10 | Query embedding p50/p95 (ms) | DB search p50/p95 (ms) | Total p50/p95 (ms) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BM25 | 0.7843 | 0.8826 | 0.6302 | 0.6622 | n/a | n/a | 21.83 / 55.75 |
+| Vector, query prefix | 0.8780 | 0.9683 | 0.7016 | 0.7405 | 95.52 / 201.48 | 60.57 / 116.44 | 155.82 / 314.51 |
+| Vector, no query prefix | 0.8619 | 0.9733 | 0.7088 | 0.7430 | 108.07 / 284.52 | 79.17 / 183.18 | 190.45 / 434.22 |
+
+The vector runs evaluated 300 queries and returned at least 100 distinct
+documents for every query. Vector prefix embedding/database/total latency
+p50/p95 was 95.52/201.48, 60.57/116.44, and 155.82/314.51 ms. Without the
+prefix it was 108.07/284.52, 79.17/183.18, and 190.45/434.22 ms.
+BM25 also returned 100 distinct documents for all 300 queries. The earlier
+summary table had a typo: its header and rows included only one combined
+latency column, omitting the query-embedding column; the generated JSON files
+were correct and contained embedding, DB-search, and total latency fields.
+The prefix did not improve every metric: no-prefix recall@100, MRR@10, and
+nDCG@10 were higher (0.9733, 0.7088, and 0.7430) than the prefix values
+(0.9683, 0.7016, and 0.7405).
+
+The exact evaluation commands are:
+
+```powershell
+python .\scripts\eval\run_eval.py --retriever bm25
+python .\scripts\eval\run_eval.py --retriever vector
+python .\scripts\eval\run_eval.py --retriever vector --no-query-prefix
+```
+
+The SQL/Python cosine sanity check maximum score difference was
+`1.1920928955078125e-07`, and the ranking order matched. Five fixed-seed
+chunk self-queries all returned their own document at rank 1. Failure
+analysis is recorded in
+[`results/failures_bm25_vs_vector.md`](results/failures_bm25_vs_vector.md).
+
 ## Colab embedding workflow
 
 1. Export every stored chunk without changing its text:
