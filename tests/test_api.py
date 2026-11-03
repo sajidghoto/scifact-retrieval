@@ -3,8 +3,33 @@ import logging
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
+from types import SimpleNamespace
 
 from app import main
+
+
+def test_cached_bm25_matches_uncached_results(monkeypatch):
+    documents = [
+        SimpleNamespace(doc_id="doc-a", title="Alpha", text="cell biology"),
+        SimpleNamespace(doc_id="doc-b", title="Beta", text="cell chemistry"),
+        SimpleNamespace(doc_id="doc-c", title="Gamma", text="unrelated"),
+    ]
+
+    class FakeSession:
+        def scalars(self, _statement):
+            return documents
+
+    uncached = main.BM25(
+        [
+            main.DocumentRecord(document.doc_id, document.title, document.text)
+            for document in documents
+        ]
+    )
+    monkeypatch.setattr(main, "_bm25_retriever", None)
+    cached = main._get_bm25_retriever(FakeSession())
+
+    assert cached.search("cell biology", 3) == uncached.search("cell biology", 3)
+    assert main._get_bm25_retriever(FakeSession()) is cached
 
 
 def test_vector_model_failure_is_logged_and_specific(monkeypatch, caplog):

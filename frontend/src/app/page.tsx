@@ -24,7 +24,7 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"bm25" | "vector">("bm25");
+  const [mode, setMode] = useState<"bm25" | "vector" | "hybrid">("bm25");
 
   useEffect(() => {
     fetch(`${apiUrl}/stats`)
@@ -71,8 +71,8 @@ export default function Home() {
           SciFact Retrieval System
         </h1>
         <p className="text-lg text-gray-600">
-          Search the locally ingested SciFact corpus with the deterministic BM25
-          baseline.
+          Search the locally ingested SciFact corpus with BM25, vector, or
+          frozen hybrid retrieval.
         </p>
       </header>
 
@@ -101,11 +101,14 @@ export default function Home() {
           <select
             className="rounded border border-gray-300 bg-white px-2 py-1 text-gray-900"
             id="mode"
-            onChange={(event) => setMode(event.target.value as "bm25" | "vector")}
+            onChange={(event) =>
+              setMode(event.target.value as "bm25" | "vector" | "hybrid")
+            }
             value={mode}
           >
             <option value="bm25">BM25</option>
             <option value="vector">Vector</option>
+            <option value="hybrid">Hybrid</option>
           </select>
         </label>
         {stats && (

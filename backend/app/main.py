@@ -18,12 +18,18 @@ from sqlalchemy.orm import Session
 from app.db.models import Chunk, Document
 from app.retrieval import BM25, DocumentRecord
 from app.vector_retrieval import VectorRetriever
+from app.hybrid_retrieval import HybridRetriever
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT_DIR))
 logger = logging.getLogger(__name__)
 _vector_embedder = None
 _vector_embedder_lock = Lock()
+_bm25_retriever = None
+_bm25_retriever_lock = Lock()
+_preload_complete = False
+_preload_error: str | None = None
+PRELOAD_ENV = "SCIFACT_PRELOAD"
 
 load_dotenv()
 
@@ -102,10 +108,83 @@ def _get_vector_embedder(model: str):
     return _vector_embedder
 
 
+def _preload_enabled() -> bool:
+    return os.getenv(PRELOAD_ENV, "").lower() in {"1", "true", "yes", "on"}
+
+
+def _get_bm25_retriever(session: Session) -> BM25:
+    global _bm25_retriever
+    if _bm25_retriever is None:
+        with _bm25_retriever_lock:
+            if _bm25_retriever is None:
+                documents = list(
+                    session.scalars(select(Document).order_by(Document.doc_id))
+                )
+                if not documents:
+                    raise ValueError(
+                        "No documents are ingested. Run the ingestion script first."
+                    )
+                records = [
+                    DocumentRecord(doc.doc_id, doc.title, doc.text)
+                    for doc in documents
+                ]
+                started = time.perf_counter()
+                _bm25_retriever = BM25(records)
+                logger.info(
+                    "Built BM25 index for %d documents in %.3f seconds",
+                    len(records),
+                    time.perf_counter() - started,
+                )
+    return _bm25_retriever
+
+
+@app.on_event("startup")
+def preload_resources() -> None:
+    global _preload_complete, _preload_error
+    if not _preload_enabled():
+        return
+    try:
+        from scripts.embed.config import EmbeddingConfig
+
+        if engine is None:
+            raise RuntimeError("DATABASE_URL is not configured.")
+        _get_vector_embedder(EmbeddingConfig.from_environment().model)
+        with Session(engine) as session:
+            _get_bm25_retriever(session)
+        _preload_complete = True
+    except (
+        ImportError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        KeyError,
+        SQLAlchemyError,
+    ) as error:
+        _preload_error = str(error)
+        logger.exception("Application preload failed: %s", error)
+
+
 @app.get("/health", tags=["Health"])
 def health_check() -> dict[str, str]:
     """Confirm that the API process is running."""
     return {"status": "ok"}
+
+
+@app.get("/ready", tags=["Health"])
+def readiness_check() -> dict[str, str]:
+    if not _preload_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Preloading is disabled; set {PRELOAD_ENV}=true to enable readiness.",
+        )
+    if _preload_error is not None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Application preload failed: {_preload_error}",
+        )
+    if not _preload_complete:
+        raise HTTPException(status_code=503, detail="Application preload is not complete.")
+    return {"status": "ready"}
 
 
 @app.get("/stats", response_model=StatsResponse, tags=["Dataset"])
@@ -127,19 +206,33 @@ def search_documents(
     session: DatabaseSession,
     query: Annotated[str, Query(min_length=1, max_length=500)],
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
-    mode: Annotated[Literal["bm25", "vector"], Query()] = "bm25",
+    mode: Annotated[Literal["bm25", "vector", "hybrid"], Query()] = "bm25",
 ) -> SearchResponse:
-    """Search the ingested corpus with BM25 or exact vector retrieval."""
-    if mode == "vector":
+    """Search the ingested corpus with BM25, vector, or frozen hybrid retrieval."""
+    if mode in {"vector", "hybrid"}:
         try:
             from scripts.embed.config import EmbeddingConfig
 
             config = EmbeddingConfig.from_environment()
             embedder = _get_vector_embedder(config.model)
-            retriever = VectorRetriever(
-                session,
-                embedder,
-            )
+            vector = VectorRetriever(session, embedder)
+            if mode == "hybrid":
+                import json
+
+                hybrid_config = json.loads(
+                    (ROOT_DIR / "config" / "hybrid_final.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                retriever = HybridRetriever(
+                    _get_bm25_retriever(session),
+                    vector,
+                    method=hybrid_config["method"],
+                    candidate_depth=hybrid_config["depth"],
+                    **hybrid_config["parameters"],
+                )
+            else:
+                retriever = vector
             scores = dict(retriever.search(query, limit))
             documents = list(
                 session.scalars(
@@ -161,7 +254,7 @@ def search_documents(
                     if doc_id in result_by_id
                 ],
             )
-        except (ImportError, OSError, RuntimeError, ValueError) as error:
+        except (ImportError, OSError, RuntimeError, ValueError, KeyError) as error:
             logger.exception("Vector model or dependency failure: %s", error)
             raise HTTPException(
                 status_code=503,
@@ -174,25 +267,18 @@ def search_documents(
                 detail=f"Vector retrieval database unavailable: {error}",
             ) from error
     try:
-        documents = list(session.scalars(select(Document).order_by(Document.doc_id)))
-    except SQLAlchemyError as error:
+        index = _get_bm25_retriever(session)
+    except (SQLAlchemyError, ValueError) as error:
         raise HTTPException(
             status_code=503,
-            detail="The local database is unavailable.",
+            detail=(
+                "The local database is unavailable."
+                if isinstance(error, SQLAlchemyError)
+                else str(error)
+            ),
         ) from error
-    if not documents:
-        raise HTTPException(
-            status_code=503,
-            detail="No documents are ingested. Run the ingestion script first.",
-        )
-
-    records = [
-        DocumentRecord(doc_id=doc.doc_id, title=doc.title, text=doc.text)
-        for doc in documents
-    ]
-    index = BM25(records)
     scores = dict(index.search(query, limit))
-    result_by_id = {record.doc_id: record for record in records}
+    result_by_id = {record.doc_id: record for record in index.documents}
     results = [
         SearchResult(
             doc_id=doc_id,

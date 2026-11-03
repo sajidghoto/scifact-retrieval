@@ -1,0 +1,9 @@
+{
+  "method": "weighted",
+  "parameters": {
+    "alpha": 0.7
+  },
+  "depth": 50,
+  "date": "2026-11-03",
+  "train_query_count": 809
+}

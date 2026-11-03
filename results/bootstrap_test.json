@@ -1,0 +1,103 @@
+{
+  "method": "recomputed from saved top-10 document IDs using existing metrics",
+  "queries": 300,
+  "resamples": 10000,
+  "seed": 20261103,
+  "ndcg10_checks": {
+    "bm25": {
+      "per_query_mean": 0.6622130253683596,
+      "reported": 0.6622130253683588,
+      "matches_to_4_decimals": true
+    },
+    "vector": {
+      "per_query_mean": 0.740469255566275,
+      "reported": 0.7404692555662746,
+      "matches_to_4_decimals": true
+    },
+    "hybrid": {
+      "per_query_mean": 0.7590492583758409,
+      "reported": 0.7590492583758407,
+      "matches_to_4_decimals": true
+    }
+  },
+  "comparisons": {
+    "hybrid_vs_vector": {
+      "ndcg@10": {
+        "mean_difference": 0.018580002809565947,
+        "ci95_percentile": [
+          0.004365236759613862,
+          0.033347874142239414
+        ],
+        "share_first_better": 0.9965
+      },
+      "recall@10": {
+        "mean_difference": 0.018333333333333333,
+        "ci95_percentile": [
+          0.005,
+          0.035
+        ],
+        "share_first_better": 0.9948
+      },
+      "mrr@10": {
+        "mean_difference": 0.02177910052910053,
+        "ci95_percentile": [
+          0.0039641865079365094,
+          0.04037589285714285
+        ],
+        "share_first_better": 0.9932
+      }
+    },
+    "hybrid_vs_bm25": {
+      "ndcg@10": {
+        "mean_difference": 0.09683623300748145,
+        "ci95_percentile": [
+          0.06444076048977553,
+          0.12959583588158757
+        ],
+        "share_first_better": 1.0
+      },
+      "recall@10": {
+        "mean_difference": 0.11205555555555556,
+        "ci95_percentile": [
+          0.07155416666666668,
+          0.1556125
+        ],
+        "share_first_better": 1.0
+      },
+      "mrr@10": {
+        "mean_difference": 0.0931005291005291,
+        "ci95_percentile": [
+          0.05743154761904762,
+          0.12882351190476188
+        ],
+        "share_first_better": 1.0
+      }
+    },
+    "vector_vs_bm25": {
+      "ndcg@10": {
+        "mean_difference": 0.07825623019791551,
+        "ci95_percentile": [
+          0.0400974452429046,
+          0.11547606623364148
+        ],
+        "share_first_better": 1.0
+      },
+      "recall@10": {
+        "mean_difference": 0.09372222222222222,
+        "ci95_percentile": [
+          0.04916388888888889,
+          0.13977777777777778
+        ],
+        "share_first_better": 0.9999
+      },
+      "mrr@10": {
+        "mean_difference": 0.07132142857142858,
+        "ci95_percentile": [
+          0.02983664021164021,
+          0.11216964285714286
+        ],
+        "share_first_better": 0.9998
+      }
+    }
+  }
+}

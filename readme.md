@@ -15,6 +15,7 @@ A reproducible document-retrieval research project using the BEIR SciFact benchm
 - [x] Build and evaluate lexical retrieval baseline
 - [x] Expose retrieval and chunk statistics through the API
 - [x] Connect the frontend search interface
+- [x] Add leakage-free hybrid retrieval tuning on the SciFact train split
 
 ## Architecture
 
@@ -47,6 +48,23 @@ Start the API from the repository root:
 python -m pip install -r backend/requirements.txt
 uvicorn app.main:app --app-dir backend --reload
 ```
+
+The API lazily loads the embedding model and builds the BM25 index once per
+process. Set `SCIFACT_PRELOAD=true` to load both at startup; when enabled,
+`GET /ready` reports readiness after preload completes. `/health` remains a
+cheap process health check.
+
+Single-worker API measurement using Python `http.client`, `psutil` RSS refreshed
+on every sample, and 10 distinct queries:
+
+| Loading | RSS after startup (MB) | RSS after first vector (MB) | RSS after 20 mixed (MB) | Peak RSS (MB) | BM25 p50/p95 (ms) | Vector p50/p95 (ms) | Hybrid p50/p95 (ms) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Lazy | 77.01 | 883.87 | 958.91 | 965.23 | 28.83 / 42.06 | 132.98 / 164.69 | 156.95 / 223.00 |
+| Preload | 944.79 | 949.71 | 958.43 | 965.61 | 27.01 / 40.33 | 177.64 / 221.29 | 200.43 / 260.88 |
+
+Each mode used 30 requests. Lazy first-vector latency was 44,851.34 ms;
+preload readiness took 50,763.90 ms. Model construction measured 37,024.68 ms
+and BM25 construction measured 5,142.55 ms.
 
 ## Ingest SciFact
 
@@ -96,6 +114,25 @@ the BGE model-card prefix
 only for vector queries; stored chunk text is unchanged. The commands write
 summary and per-query JSON files under `results/`.
 
+Hybrid evaluation is prepared with the frozen configuration at
+`config/hybrid_final.json`:
+
+```powershell
+python .\scripts\eval\run_eval.py --retriever hybrid --config .\config\hybrid_final.json
+```
+
+The hybrid protocol caches BM25 and prefixed-vector candidates for the 809 train
+queries, tunes only from that cache, and freezes the selected method,
+parameters, and candidate depth before the 300-query test evaluation.
+
+Final frozen hybrid test result: recall@10 **0.8963**, recall@100 **0.9617**,
+MRR@10 **0.7233**, nDCG@10 **0.7590**, with latency p50/p95 of
+**138.58/219.80 ms** over 300 queries. The run used weighted fusion with
+alpha 0.7 and candidate depth 50.
+
+The hybrid per-query results were regenerated after fixing a missing output-row
+bug; all four quality metrics matched the earlier run to four decimals.
+
 Measured on the local SciFact database with `BAAI/bge-base-en-v1.5`:
 
 | Retriever | Recall@10 | Recall@100 | MRR@10 | nDCG@10 | Query embedding p50/p95 (ms) | DB search p50/p95 (ms) | Total p50/p95 (ms) |
@@ -122,7 +159,14 @@ The exact evaluation commands are:
 python .\scripts\eval\run_eval.py --retriever bm25
 python .\scripts\eval\run_eval.py --retriever vector
 python .\scripts\eval\run_eval.py --retriever vector --no-query-prefix
+python .\scripts\eval\bootstrap.py
 ```
+
+The bootstrap outputs are
+[`results/bootstrap_test.json`](results/bootstrap_test.json) and
+[`results/bootstrap_test.md`](results/bootstrap_test.md). Hybrid failure
+analysis is recorded in
+[`results/failures_hybrid.md`](results/failures_hybrid.md).
 
 The SQL/Python cosine sanity check maximum score difference was
 `1.1920928955078125e-07`, and the ranking order matched. Five fixed-seed
@@ -162,8 +206,11 @@ The API allows requests from `http://localhost:3000` by default; set
 The local API provides:
 
 - `GET /health` — process health check
+- `GET /ready` — preload readiness; returns 503 when preload is disabled,
+  incomplete, or failed
 - `GET /stats` — ingested document and chunk counts
 - `GET /search?query=<text>&limit=<1-50>` — BM25-ranked document results
+- `GET /search?query=<text>&limit=<1-50>&mode=hybrid` — frozen hybrid results
 
 The `/stats` and `/search` endpoints require a configured `DATABASE_URL` and
 an ingested local database. Deployment remains deferred until this workflow is

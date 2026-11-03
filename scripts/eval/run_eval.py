@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT_DIR / "backend"))
 from app.db.models import Document  # noqa: E402
 from app.retrieval import DocumentRecord  # noqa: E402
 from app.vector_retrieval import VectorRetriever  # noqa: E402
+from app.hybrid_retrieval import HybridRetriever  # noqa: E402
 from scripts.embed.config import EmbeddingConfig  # noqa: E402
 from scripts.eval.baseline import (  # noqa: E402
     read_documents,
@@ -128,9 +129,51 @@ def evaluate_vector(args, queries, qrels):
     }
 
 
+def evaluate_hybrid(args, queries, qrels):
+    config = json.loads(args.config.read_text(encoding="utf-8"))
+    documents = read_documents(args.corpus)
+    bm25 = BM25Retriever(documents)
+    load_dotenv(ROOT_DIR / ".env")
+    database_url = __import__("os").getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is not set")
+    engine = create_engine(database_url)
+    embedder = SentenceTransformerQueryEmbedder(EmbeddingConfig.from_environment().model)
+    rankings = {}
+    per_query = []
+    timings = []
+    try:
+        with Session(engine) as session:
+            vector = VectorRetriever(session, embedder, use_query_prefix=True)
+            retriever = HybridRetriever(
+                bm25,
+                vector,
+                method=config["method"],
+                candidate_depth=config["depth"],
+                **config["parameters"],
+            )
+            for query_id in qrels:
+                started = time.perf_counter()
+                results = retriever.search(queries[query_id], 100)
+                elapsed = (time.perf_counter() - started) * 1000
+                timings.append(elapsed)
+                ranked = [doc_id for doc_id, _ in results]
+                rankings[query_id] = ranked
+                per_query.append({
+                    "query_id": query_id,
+                    "top10_doc_ids": ranked[:10],
+                    "hit_at_10": bool(set(ranked[:10]) & qrels[query_id]),
+                    "latency_ms": {"total": elapsed},
+                })
+    finally:
+        engine.dispose()
+    return rankings, per_query, timings, {"frozen_config": config}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--retriever", choices=["bm25", "vector"], required=True)
+    parser.add_argument("--retriever", choices=["bm25", "vector", "hybrid"], required=True)
+    parser.add_argument("--config", type=Path, default=ROOT_DIR / "config" / "hybrid_final.json")
     parser.add_argument("--no-query-prefix", action="store_true")
     parser.add_argument("--corpus", type=Path, default=DATA_DIR / "corpus.jsonl")
     parser.add_argument("--queries", type=Path, default=DATA_DIR / "queries.jsonl")
@@ -144,21 +187,30 @@ def main(argv: list[str] | None = None) -> int:
         evaluate_bm25(args, queries, qrels)
         if args.retriever == "bm25"
         else evaluate_vector(args, queries, qrels)
+        if args.retriever == "vector"
+        else evaluate_hybrid(args, queries, qrels)
     )
+    if qrels and not per_query:
+        raise RuntimeError(
+            f"{args.retriever} evaluation produced zero per-query rows for "
+            f"{len(qrels)} queries"
+        )
     metrics = evaluate_rankings(rankings, qrels)
     variant = "no_prefix" if args.no_query_prefix else "prefix"
     if args.retriever == "bm25":
         variant = "default"
+    if args.retriever == "hybrid":
+        variant = "frozen"
     config = EmbeddingConfig.from_environment()
     result = {
         "config": {
             "retriever": args.retriever,
-            "model": config.model if args.retriever == "vector" else None,
-            "dimension": config.dimension if args.retriever == "vector" else None,
+            "model": config.model if args.retriever in {"vector", "hybrid"} else None,
+            "dimension": config.dimension if args.retriever in {"vector", "hybrid"} else None,
             "chunk_size": 256,
             "chunk_overlap": 64,
             "query_prefix": None if args.retriever == "bm25" else not args.no_query_prefix,
-            "aggregation": "max chunk cosine similarity" if args.retriever == "vector" else None,
+            "aggregation": "max chunk cosine similarity" if args.retriever in {"vector", "hybrid"} else None,
             "date": datetime.now(timezone.utc).isoformat(),
         },
         "metrics": metrics,
