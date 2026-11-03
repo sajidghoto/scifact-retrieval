@@ -16,6 +16,7 @@ A reproducible document-retrieval research project using the BEIR SciFact benchm
 - [x] Expose retrieval and chunk statistics through the API
 - [x] Connect the frontend search interface
 - [x] Add leakage-free hybrid retrieval tuning on the SciFact train split
+- [x] Add deterministic, evidence-grounded Gemini answer-generation evaluation
 
 ## Architecture
 
@@ -167,6 +168,27 @@ The bootstrap outputs are
 [`results/bootstrap_test.md`](results/bootstrap_test.md). Hybrid failure
 analysis is recorded in
 [`results/failures_hybrid.md`](results/failures_hybrid.md).
+
+## Evidence-grounded answer generation
+
+Generation uses the official Google Gemini Python SDK with `GEMINI_MODEL` and
+`GEMINI_API_KEY` loaded from `.env`; neither has a code default. The versioned
+prompt is [`prompts/answer_v1.txt`](prompts/answer_v1.txt). Responses are
+strictly validated, cached as raw JSONL records, and resumable without
+repeating cached API calls. The evaluator uses only deterministic validity,
+grounding, citation, abstention, and paired-bootstrap metrics:
+
+```powershell
+$env:GEMINI_MODEL = "<configured-model>"
+python .\scripts\eval\run_generation_eval.py --limit 5 --dry-run --run smoke
+python .\scripts\eval\run_generation_eval.py --limit 5 --run smoke --run-cap 10
+```
+
+The full run must only be started after reviewing the smoke output:
+
+```powershell
+python .\scripts\eval\run_generation_eval.py --run full --run-cap 600
+```
 
 The SQL/Python cosine sanity check maximum score difference was
 `1.1920928955078125e-07`, and the ranking order matched. Five fixed-seed

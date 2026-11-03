@@ -1,0 +1,109 @@
+[
+  {
+    "claim_id": "1",
+    "claim": "0-dimensional biomaterials show inductive properties.",
+    "retriever": "hybrid",
+    "prompt_version": "answer_v1",
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-11-03",
+    "context_doc_ids": [
+      "14103509",
+      "23763738",
+      "7583104",
+      "21456232",
+      "14082855"
+    ],
+    "parsed": {
+      "verdict": "insufficient",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts do not contain information about 0-dimensional biomaterials or their inductive properties. The documents discuss bone fracture, cytotoxicity assays, surgical meshes, and graphene-based platforms for stem cell culture."
+    },
+    "raw_response": "{\"verdict\": \"insufficient\", \"cited_doc_ids\": [], \"rationale\": \"The provided abstracts do not contain information about 0-dimensional biomaterials or their inductive properties. The documents discuss bone fracture, cytotoxicity assays, surgical meshes, and graphene-based platforms for stem cell culture.\"}"
+  },
+  {
+    "claim_id": "1",
+    "claim": "0-dimensional biomaterials show inductive properties.",
+    "retriever": "bm25",
+    "prompt_version": "answer_v1",
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-11-03",
+    "context_doc_ids": [
+      "43385013",
+      "10608397",
+      "40212412",
+      "10931595",
+      "27049238"
+    ],
+    "parsed": {
+      "verdict": "insufficient",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts discuss various scientific topics including cell biology, neuroprosthetics, bone formation, developmental patterning, and red blood cell behavior. None of the abstracts mention or describe 0-dimensional biomaterials or their inductive properties."
+    },
+    "raw_response": "{\"verdict\": \"insufficient\", \"cited_doc_ids\": [], \"rationale\": \"The provided abstracts discuss various scientific topics including cell biology, neuroprosthetics, bone formation, developmental patterning, and red blood cell behavior. None of the abstracts mention or describe 0-dimensional biomaterials or their inductive properties.\"}"
+  },
+  {
+    "claim_id": "3",
+    "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+    "retriever": "hybrid",
+    "prompt_version": "answer_v1",
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-11-03",
+    "context_doc_ids": [
+      "4414547",
+      "14717500",
+      "4632921",
+      "23389795",
+      "10944947"
+    ],
+    "parsed": {
+      "verdict": "insufficient",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project."
+    },
+    "raw_response": "{\"verdict\": \"insufficient\", \"cited_doc_ids\": [], \"rationale\": \"The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project.\"}"
+  },
+  {
+    "claim_id": "3",
+    "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+    "retriever": "bm25",
+    "prompt_version": "answer_v1",
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-11-03",
+    "context_doc_ids": [
+      "14717500",
+      "2739854",
+      "3672261",
+      "23389795",
+      "4632921"
+    ],
+    "parsed": {
+      "verdict": "insufficient",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts do not contain information about the 1,000 genomes project specifically enabling the mapping of genetic sequence variation or comparing the penetrance effects of rare versus common variants."
+    },
+    "raw_response": "{\"verdict\": \"insufficient\", \"cited_doc_ids\": [], \"rationale\": \"The provided abstracts do not contain information about the 1,000 genomes project specifically enabling the mapping of genetic sequence variation or comparing the penetrance effects of rare versus common variants.\"}"
+  },
+  {
+    "claim_id": "5",
+    "claim": "1/2000 in UK have abnormal PrP positivity.",
+    "retriever": "hybrid",
+    "prompt_version": "answer_v1",
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-11-03",
+    "context_doc_ids": [
+      "13734012",
+      "27063470",
+      "18617259",
+      "25261168",
+      "11349166"
+    ],
+    "parsed": {
+      "verdict": "supports",
+      "cited_doc_ids": [
+        "13734012"
+      ],
+      "rationale": "A large-scale survey of 32,441 archived appendix samples in the UK found 16 positive for abnormal PrP, indicating an overall prevalence of 493 per million population, which is approximately 1 in 2028."
+    },
+    "raw_response": "{\"verdict\": \"supports\", \"cited_doc_ids\": [\"13734012\"], \"rationale\": \"A large-scale survey of 32,441 archived appendix samples in the UK found 16 positive for abnormal PrP, indicating an overall prevalence of 493 per million population, which is approximately 1 in 2028.\"}"
+  }
+]

@@ -1,0 +1,166 @@
+{
+  "date": "2026-11-03",
+  "prompt_version": "answer_v1",
+  "model": "gemini-2.5-flash-lite",
+  "queries": 5,
+  "api_calls": 0,
+  "cache_file": "results\\cache\\generation_smoke.jsonl",
+  "results": {
+    "hybrid": {
+      "queries": 5,
+      "validity_rate": {
+        "count": 5,
+        "denominator": 5,
+        "value": 1.0
+      },
+      "grounding_rate": {
+        "count": 5,
+        "denominator": 5,
+        "value": 1.0
+      },
+      "citation_precision": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "citation_recall": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "answered_with_relevant_citation_rate": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "abstention": {
+        "no_relevant_in_top5": {
+          "queries": 3,
+          "insufficient": 3,
+          "abstention_rate": 1.0
+        },
+        "relevant_in_top5": {
+          "queries": 2,
+          "insufficient": 1,
+          "abstention_rate": 0.5
+        }
+      },
+      "failures": 0
+    },
+    "bm25": {
+      "queries": 5,
+      "validity_rate": {
+        "count": 5,
+        "denominator": 5,
+        "value": 1.0
+      },
+      "grounding_rate": {
+        "count": 5,
+        "denominator": 5,
+        "value": 1.0
+      },
+      "citation_precision": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "citation_recall": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "answered_with_relevant_citation_rate": {
+        "count": 1,
+        "denominator": 1,
+        "value": 1.0
+      },
+      "abstention": {
+        "no_relevant_in_top5": {
+          "queries": 3,
+          "insufficient": 3,
+          "abstention_rate": 1.0
+        },
+        "relevant_in_top5": {
+          "queries": 2,
+          "insufficient": 1,
+          "abstention_rate": 0.5
+        }
+      },
+      "failures": 0
+    }
+  },
+  "examples": [
+    {
+      "type": "grounded",
+      "retriever": "hybrid",
+      "claim": "0-dimensional biomaterials show inductive properties.",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts do not contain information about 0-dimensional biomaterials or their inductive properties. The documents discuss bone fracture, cytotoxicity assays, surgical meshes, and graphene-based platforms for stem cell culture."
+    },
+    {
+      "type": "grounded",
+      "retriever": "hybrid",
+      "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project."
+    },
+    {
+      "type": "grounded",
+      "retriever": "hybrid",
+      "claim": "1/2000 in UK have abnormal PrP positivity.",
+      "cited_doc_ids": [
+        "13734012"
+      ],
+      "rationale": "A large-scale survey of 32,441 archived appendix samples in the UK found 16 positive for abnormal PrP, indicating an overall prevalence of 493 per million population, which is approximately 1 in 2028."
+    },
+    {
+      "type": "grounded",
+      "retriever": "hybrid",
+      "claim": "5% of perinatal mortality is due to low birth weight.",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts do not contain specific statistics on the percentage of perinatal mortality attributed to low birth weight. While low birth weight is mentioned as a factor in some contexts, its precise contribution to perinatal mortality is not quantified."
+    },
+    {
+      "type": "failure",
+      "failure": "wrong abstention",
+      "retriever": "hybrid",
+      "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project."
+    },
+    {
+      "type": "failure",
+      "failure": "wrong abstention",
+      "retriever": "bm25",
+      "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+      "cited_doc_ids": [],
+      "rationale": "The provided abstracts do not contain information about the 1,000 genomes project specifically enabling the mapping of genetic sequence variation or comparing the penetrance effects of rare versus common variants."
+    }
+  ],
+  "paired_bootstrap_hybrid_minus_bm25": {
+    "validity_rate": {
+      "mean_difference": 0.0,
+      "ci95_percentile": [
+        0.0,
+        0.0
+      ],
+      "share_first_better": 0.0
+    },
+    "grounding_rate": {
+      "mean_difference": 0.0,
+      "ci95_percentile": [
+        0.0,
+        0.0
+      ],
+      "share_first_better": 0.0
+    },
+    "insufficient_rate": {
+      "mean_difference": 0.0,
+      "ci95_percentile": [
+        0.0,
+        0.0
+      ],
+      "share_first_better": 0.0
+    }
+  }
+}

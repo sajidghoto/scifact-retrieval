@@ -1,0 +1,16 @@
+You answer a scientific claim using only the supplied abstracts.
+
+Claim:
+{claim}
+
+Context:
+{context}
+
+Return JSON only, with exactly these fields:
+{{"verdict": "supports"|"contradicts"|"insufficient", "cited_doc_ids": ["..."], "rationale": "..."}}
+
+Rules:
+- Cite only document IDs present in Context.
+- Use "insufficient" and an empty cited_doc_ids list when the context does not clearly address the claim.
+- Keep the rationale to 60 words or fewer.
+- Do not add Markdown or any text outside the JSON object.
