@@ -23,6 +23,15 @@ Thumbs.db
 
 # Generated embedding exports
 data/exports/
+data/raw/
+*.npy
+*.parquet
 
 # Generated result backups
 results/*.bak
+results/cache/
+*.bak
+
+# General generated files
+node_modules/
+__pycache__/
