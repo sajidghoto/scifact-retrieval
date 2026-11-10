@@ -121,6 +121,7 @@ Examples, quoted verbatim from `results/generation_eval.md`:
 - Exact search and a single-node database do not establish deployment-scale behavior.
 - Generation results are a five-query deterministic smoke evaluation with no human or independent verdict accuracy assessment.
 
+
 ## Reproduction
 
 See [REPRODUCE.md](REPRODUCE.md) for copy-pasteable commands and command verification.

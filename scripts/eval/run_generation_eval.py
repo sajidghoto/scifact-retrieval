@@ -1,4 +1,4 @@
-"""Run deterministic evaluation of cached Gemini evidence-grounded answers."""
+"""Generate or deterministically evaluate evidence-grounded answer cache rows."""
 
 from __future__ import annotations
 
@@ -52,6 +52,10 @@ def _load_cache(path: Path) -> dict[tuple[str, str, str, str], dict]:
                 )
             except (KeyError, json.JSONDecodeError, TypeError) as error:
                 raise ValueError(f"Invalid generation cache row {line_number}") from error
+            if not all(isinstance(value, str) for value in key):
+                raise ValueError(f"Invalid generation cache key on line {line_number}")
+            if key in cache:
+                raise ValueError(f"Duplicate generation cache key on line {line_number}")
             cache[key] = row
     return cache
 
@@ -144,6 +148,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-cap", type=int, default=100)
     parser.add_argument("--daily-limit", type=int, default=1500)
     parser.add_argument("--retrievers", default="hybrid,bm25")
+    parser.add_argument("--cache-only", action="store_true")
+    parser.add_argument("--model")
     parser.add_argument("--cache-dir", type=Path, default=ROOT_DIR / "results" / "cache")
     parser.add_argument("--output-json", type=Path, default=ROOT_DIR / "results" / "generation_eval.json")
     parser.add_argument("--output-md", type=Path, default=ROOT_DIR / "results" / "generation_eval.md")
@@ -153,10 +159,6 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--limit must be positive")
     if args.run_cap <= 0 or args.daily_limit <= 0:
         raise ValueError("--run-cap and --daily-limit must be positive")
-    load_dotenv(ROOT_DIR / ".env")
-    model = os.getenv("GEMINI_MODEL")
-    if not model:
-        raise RuntimeError("GEMINI_MODEL is not set")
     qrels = read_qrels(DATA_DIR / "qrels" / "test.tsv")
     queries = read_queries(DATA_DIR / "queries.jsonl")
     documents = {doc.doc_id: doc for doc in read_documents(DATA_DIR / "corpus.jsonl")}
@@ -173,6 +175,47 @@ def main(argv: list[str] | None = None) -> int:
         claim_ids = claim_ids[:args.limit]
     cache_path = args.cache_dir / f"generation_{args.run}.jsonl"
     cache = _load_cache(cache_path)
+    if args.cache_only:
+        candidate_models = {
+            row["model"]
+            for key, row in cache.items()
+            if key[0] in claim_ids and key[1] in selected and key[2] == PROMPT_VERSION
+        }
+        if args.model:
+            model = args.model
+        else:
+            complete_models = [
+                candidate
+                for candidate in candidate_models
+                if all(
+                    (claim_id, retriever, PROMPT_VERSION, candidate) in cache
+                    for claim_id in claim_ids
+                    for retriever in selected
+                )
+            ]
+            if len(complete_models) != 1:
+                if len(complete_models) > 1:
+                    raise RuntimeError(
+                        "--cache-only found complete rows for multiple models; specify --model"
+                    )
+                if len(candidate_models) == 1:
+                    model = next(iter(candidate_models))
+                elif not candidate_models:
+                    raise RuntimeError(
+                        "--cache-only found no requested generation cache rows; "
+                        "specify --model or import the outputs first"
+                    )
+                else:
+                    raise RuntimeError(
+                        "--cache-only found incomplete rows for multiple models; specify --model"
+                    )
+            else:
+                model = complete_models[0]
+    else:
+        load_dotenv(ROOT_DIR / ".env")
+        model = args.model or os.getenv("GEMINI_MODEL")
+        if not model:
+            raise RuntimeError("GEMINI_MODEL is not set (or pass --model)")
     keys = [
         (claim_id, retriever, PROMPT_VERSION, model)
         for claim_id in claim_ids
@@ -180,17 +223,25 @@ def main(argv: list[str] | None = None) -> int:
     ]
     missing = [key for key in keys if key not in cache]
     cached_calls = len(keys) - len(missing)
-    print(f"Calls made before run: {cached_calls} (cache misses pending: {len(missing)})")
-    print(f"Daily calls remaining before run: {args.daily_limit - cached_calls}")
+    if args.cache_only:
+        print(f"Cache hits: {cached_calls}; API calls in this run: 0")
+    else:
+        print(f"Calls made before run: {cached_calls} (cache misses pending: {len(missing)})")
+        print(f"Daily calls remaining before run: {args.daily_limit - cached_calls}")
+    if args.cache_only and missing:
+        raise RuntimeError(
+            f"--cache-only cannot run: {len(missing)} generation cache key(s) are missing; "
+            f"first missing key: {missing[0]}"
+        )
     if args.dry_run:
         print(f"Dry run: API calls needed: {len(missing)}")
         return 0
-    if len(missing) > min(args.run_cap, args.daily_limit):
+    if not args.cache_only and len(missing) > min(args.run_cap, args.daily_limit):
         raise RuntimeError(
             f"Run requires {len(missing)} calls but cap allows {min(args.run_cap, args.daily_limit)}; "
             "increase the cap or resume in another run."
         )
-    client = create_gemini_client()
+    client = create_gemini_client() if missing and not args.cache_only else None
     calls = 0
     for key in missing:
         claim_id, retriever, _, _ = key
@@ -211,6 +262,8 @@ def main(argv: list[str] | None = None) -> int:
             "context_doc_ids": context_ids,
         }
         try:
+            if client is None:
+                raise AssertionError("Generation client is unavailable for a cache miss")
             raw_response = client.generate(build_prompt(queries[claim_id], context))
             parsed = parse_response(raw_response, set(context_ids))
             row["parsed"] = {
@@ -240,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
                 examples.append({
                     "type": "grounded",
                     "retriever": retriever,
-                    "claim": row["claim"],
+                    "claim": row.get("claim", queries[row["claim_id"]]),
                     "cited_doc_ids": parsed["cited_doc_ids"],
                     "rationale": parsed["rationale"],
                 })
@@ -263,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                     "type": "failure",
                     "failure": row.get("failure", "wrong abstention"),
                     "retriever": retriever,
-                    "claim": row["claim"],
+                    "claim": row.get("claim", queries[row["claim_id"]]),
                     "cited_doc_ids": sorted(cited),
                     "rationale": parsed["rationale"] if parsed else "",
                 })
@@ -277,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         "model": model,
         "queries": len(claim_ids),
         "api_calls": calls,
+        "cache_only": args.cache_only,
         "cache_file": str(cache_path.relative_to(ROOT_DIR)),
         "results": {name: metrics for name, (metrics, _) in results.items()},
         "examples": examples + failures,

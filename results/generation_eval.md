@@ -1,53 +1,53 @@
 # Generation evaluation
 
-- Date: 2026-11-03
+- Date: 2026-11-10
 - Prompt version: `answer_v1`
-- Model: `gemini-2.5-flash-lite`
+- Model: `Qwen/Qwen3-4B@1cfa9a7208912126459214e8b04321603b3df60c`
 - API calls made: 0
 
 ## hybrid
 
 ```json
 {
-  "queries": 5,
+  "queries": 300,
   "validity_rate": {
-    "count": 5,
-    "denominator": 5,
-    "value": 1.0
+    "count": 299,
+    "denominator": 300,
+    "value": 0.9966666666666667
   },
   "grounding_rate": {
-    "count": 5,
-    "denominator": 5,
-    "value": 1.0
+    "count": 299,
+    "denominator": 300,
+    "value": 0.9966666666666667
   },
   "citation_precision": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 256,
+    "denominator": 256,
+    "value": 0.6870442708333334
   },
   "citation_recall": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 256,
+    "denominator": 256,
+    "value": 0.7744791666666667
   },
   "answered_with_relevant_citation_rate": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 205,
+    "denominator": 256,
+    "value": 0.80078125
   },
   "abstention": {
     "no_relevant_in_top5": {
-      "queries": 3,
-      "insufficient": 3,
-      "abstention_rate": 1.0
+      "queries": 49,
+      "insufficient": 16,
+      "abstention_rate": 0.32653061224489793
     },
     "relevant_in_top5": {
-      "queries": 2,
-      "insufficient": 1,
-      "abstention_rate": 0.5
+      "queries": 251,
+      "insufficient": 27,
+      "abstention_rate": 0.10756972111553785
     }
   },
-  "failures": 0
+  "failures": 1
 }
 ```
 
@@ -55,45 +55,45 @@
 
 ```json
 {
-  "queries": 5,
+  "queries": 300,
   "validity_rate": {
-    "count": 5,
-    "denominator": 5,
-    "value": 1.0
+    "count": 299,
+    "denominator": 300,
+    "value": 0.9966666666666667
   },
   "grounding_rate": {
-    "count": 5,
-    "denominator": 5,
-    "value": 1.0
+    "count": 299,
+    "denominator": 300,
+    "value": 0.9966666666666667
   },
   "citation_precision": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 245,
+    "denominator": 245,
+    "value": 0.6893197278911566
   },
   "citation_recall": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 245,
+    "denominator": 245,
+    "value": 0.7406122448979592
   },
   "answered_with_relevant_citation_rate": {
-    "count": 1,
-    "denominator": 1,
-    "value": 1.0
+    "count": 189,
+    "denominator": 245,
+    "value": 0.7714285714285715
   },
   "abstention": {
     "no_relevant_in_top5": {
-      "queries": 3,
-      "insufficient": 3,
-      "abstention_rate": 1.0
+      "queries": 76,
+      "insufficient": 34,
+      "abstention_rate": 0.4473684210526316
     },
     "relevant_in_top5": {
-      "queries": 2,
-      "insufficient": 1,
-      "abstention_rate": 0.5
+      "queries": 224,
+      "insufficient": 20,
+      "abstention_rate": 0.08928571428571429
     }
   },
-  "failures": 0
+  "failures": 1
 }
 ```
 
@@ -101,19 +101,25 @@
 
 1. **grounded / hybrid** — 0-dimensional biomaterials show inductive properties.  
 Cited IDs: `[]`  
-Rationale: The provided abstracts do not contain information about 0-dimensional biomaterials or their inductive properties. The documents discuss bone fracture, cytotoxicity assays, surgical meshes, and graphene-based platforms for stem cell culture.
+Rationale: No document addresses 0-dimensional biomaterials or their inductive properties directly.
 2. **grounded / hybrid** — 1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.  
-Cited IDs: `[]`  
-Rationale: The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project.
+Cited IDs: `['4414547', '14717500']`  
+Rationale: The 1,000 Genomes Project supports rare variant analysis, as shown by PPM1D mutations and synthetic associations in the context.
 3. **grounded / hybrid** — 1/2000 in UK have abnormal PrP positivity.  
 Cited IDs: `['13734012']`  
-Rationale: A large-scale survey of 32,441 archived appendix samples in the UK found 16 positive for abnormal PrP, indicating an overall prevalence of 493 per million population, which is approximately 1 in 2028.
+Rationale: The study found 493 per million prevalence of abnormal PrP, contradicting the 1/2000 (500 per million) claim.
 4. **grounded / hybrid** — 5% of perinatal mortality is due to low birth weight.  
 Cited IDs: `[]`  
-Rationale: The provided abstracts do not contain specific statistics on the percentage of perinatal mortality attributed to low birth weight. While low birth weight is mentioned as a factor in some contexts, its precise contribution to perinatal mortality is not quantified.
-5. **failure / hybrid** — 1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.  
+Rationale: No document directly addresses the 5% perinatal mortality due to low birth weight claim.
+5. **failure / hybrid** — A total of 1,000 people in the UK are asymptomatic carriers of vCJD infection.  
 Cited IDs: `[]`  
-Rationale: The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project.
-6. **failure / bm25** — 1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.  
+Rationale: No document directly addresses the specific claim about 1,000 asymptomatic vCJD carriers in the UK.
+6. **failure / hybrid** — Active H. pylori urease has a polymeric structure that compromises two subunits, UreA and UreB.  
 Cited IDs: `[]`  
-Rationale: The provided abstracts do not contain information about the 1,000 genomes project specifically enabling the mapping of genetic sequence variation or comparing the penetrance effects of rare versus common variants.
+Rationale: No document directly addresses the structure of H. pylori urease subunits.
+7. **failure / hybrid** — Alizarin forms hydrogen bonds with residues involved in PGAM1 substrate binding.  
+Cited IDs: `[]`  
+Rationale: No document mentions alizarin or PGAM1 hydrogen bonding interactions.
+8. **failure / hybrid** — CCL19 is absent within dLNs.  
+Cited IDs: `[]`  
+Rationale: No document explicitly states whether CCL19 is absent in dLNs.

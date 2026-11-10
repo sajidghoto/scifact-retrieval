@@ -1,92 +1,93 @@
 {
-  "date": "2026-11-03",
+  "date": "2026-11-10",
   "prompt_version": "answer_v1",
-  "model": "gemini-2.5-flash-lite",
-  "queries": 5,
+  "model": "Qwen/Qwen3-4B@1cfa9a7208912126459214e8b04321603b3df60c",
+  "queries": 300,
   "api_calls": 0,
-  "cache_file": "results\\cache\\generation_smoke.jsonl",
+  "cache_only": true,
+  "cache_file": "results\\cache\\generation_test.jsonl",
   "results": {
     "hybrid": {
-      "queries": 5,
+      "queries": 300,
       "validity_rate": {
-        "count": 5,
-        "denominator": 5,
-        "value": 1.0
+        "count": 299,
+        "denominator": 300,
+        "value": 0.9966666666666667
       },
       "grounding_rate": {
-        "count": 5,
-        "denominator": 5,
-        "value": 1.0
+        "count": 299,
+        "denominator": 300,
+        "value": 0.9966666666666667
       },
       "citation_precision": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 256,
+        "denominator": 256,
+        "value": 0.6870442708333334
       },
       "citation_recall": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 256,
+        "denominator": 256,
+        "value": 0.7744791666666667
       },
       "answered_with_relevant_citation_rate": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 205,
+        "denominator": 256,
+        "value": 0.80078125
       },
       "abstention": {
         "no_relevant_in_top5": {
-          "queries": 3,
-          "insufficient": 3,
-          "abstention_rate": 1.0
+          "queries": 49,
+          "insufficient": 16,
+          "abstention_rate": 0.32653061224489793
         },
         "relevant_in_top5": {
-          "queries": 2,
-          "insufficient": 1,
-          "abstention_rate": 0.5
+          "queries": 251,
+          "insufficient": 27,
+          "abstention_rate": 0.10756972111553785
         }
       },
-      "failures": 0
+      "failures": 1
     },
     "bm25": {
-      "queries": 5,
+      "queries": 300,
       "validity_rate": {
-        "count": 5,
-        "denominator": 5,
-        "value": 1.0
+        "count": 299,
+        "denominator": 300,
+        "value": 0.9966666666666667
       },
       "grounding_rate": {
-        "count": 5,
-        "denominator": 5,
-        "value": 1.0
+        "count": 299,
+        "denominator": 300,
+        "value": 0.9966666666666667
       },
       "citation_precision": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 245,
+        "denominator": 245,
+        "value": 0.6893197278911566
       },
       "citation_recall": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 245,
+        "denominator": 245,
+        "value": 0.7406122448979592
       },
       "answered_with_relevant_citation_rate": {
-        "count": 1,
-        "denominator": 1,
-        "value": 1.0
+        "count": 189,
+        "denominator": 245,
+        "value": 0.7714285714285715
       },
       "abstention": {
         "no_relevant_in_top5": {
-          "queries": 3,
-          "insufficient": 3,
-          "abstention_rate": 1.0
+          "queries": 76,
+          "insufficient": 34,
+          "abstention_rate": 0.4473684210526316
         },
         "relevant_in_top5": {
-          "queries": 2,
-          "insufficient": 1,
-          "abstention_rate": 0.5
+          "queries": 224,
+          "insufficient": 20,
+          "abstention_rate": 0.08928571428571429
         }
       },
-      "failures": 0
+      "failures": 1
     }
   },
   "examples": [
@@ -95,14 +96,17 @@
       "retriever": "hybrid",
       "claim": "0-dimensional biomaterials show inductive properties.",
       "cited_doc_ids": [],
-      "rationale": "The provided abstracts do not contain information about 0-dimensional biomaterials or their inductive properties. The documents discuss bone fracture, cytotoxicity assays, surgical meshes, and graphene-based platforms for stem cell culture."
+      "rationale": "No document addresses 0-dimensional biomaterials or their inductive properties directly."
     },
     {
       "type": "grounded",
       "retriever": "hybrid",
       "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
-      "cited_doc_ids": [],
-      "rationale": "The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project."
+      "cited_doc_ids": [
+        "4414547",
+        "14717500"
+      ],
+      "rationale": "The 1,000 Genomes Project supports rare variant analysis, as shown by PPM1D mutations and synthetic associations in the context."
     },
     {
       "type": "grounded",
@@ -111,56 +115,72 @@
       "cited_doc_ids": [
         "13734012"
       ],
-      "rationale": "A large-scale survey of 32,441 archived appendix samples in the UK found 16 positive for abnormal PrP, indicating an overall prevalence of 493 per million population, which is approximately 1 in 2028."
+      "rationale": "The study found 493 per million prevalence of abnormal PrP, contradicting the 1/2000 (500 per million) claim."
     },
     {
       "type": "grounded",
       "retriever": "hybrid",
       "claim": "5% of perinatal mortality is due to low birth weight.",
       "cited_doc_ids": [],
-      "rationale": "The provided abstracts do not contain specific statistics on the percentage of perinatal mortality attributed to low birth weight. While low birth weight is mentioned as a factor in some contexts, its precise contribution to perinatal mortality is not quantified."
+      "rationale": "No document directly addresses the 5% perinatal mortality due to low birth weight claim."
     },
     {
       "type": "failure",
       "failure": "wrong abstention",
       "retriever": "hybrid",
-      "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+      "claim": "A total of 1,000 people in the UK are asymptomatic carriers of vCJD infection.",
       "cited_doc_ids": [],
-      "rationale": "The provided abstracts discuss rare variants and their association with diseases or gene expression, but none specifically mention the 1,000 Genomes Project or compare the penetrance effects of rare versus common variants in the context of that project."
+      "rationale": "No document directly addresses the specific claim about 1,000 asymptomatic vCJD carriers in the UK."
     },
     {
       "type": "failure",
       "failure": "wrong abstention",
-      "retriever": "bm25",
-      "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+      "retriever": "hybrid",
+      "claim": "Active H. pylori urease has a polymeric structure that compromises two subunits, UreA and UreB.",
       "cited_doc_ids": [],
-      "rationale": "The provided abstracts do not contain information about the 1,000 genomes project specifically enabling the mapping of genetic sequence variation or comparing the penetrance effects of rare versus common variants."
+      "rationale": "No document directly addresses the structure of H. pylori urease subunits."
+    },
+    {
+      "type": "failure",
+      "failure": "wrong abstention",
+      "retriever": "hybrid",
+      "claim": "Alizarin forms hydrogen bonds with residues involved in PGAM1 substrate binding.",
+      "cited_doc_ids": [],
+      "rationale": "No document mentions alizarin or PGAM1 hydrogen bonding interactions."
+    },
+    {
+      "type": "failure",
+      "failure": "wrong abstention",
+      "retriever": "hybrid",
+      "claim": "CCL19 is absent within dLNs.",
+      "cited_doc_ids": [],
+      "rationale": "No document explicitly states whether CCL19 is absent in dLNs."
     }
   ],
   "paired_bootstrap_hybrid_minus_bm25": {
     "validity_rate": {
       "mean_difference": 0.0,
       "ci95_percentile": [
-        0.0,
-        0.0
+        -0.01,
+        0.01
       ],
-      "share_first_better": 0.0
+      "share_first_better": 0.3543
     },
     "grounding_rate": {
       "mean_difference": 0.0,
       "ci95_percentile": [
-        0.0,
-        0.0
+        -0.01,
+        0.01
       ],
-      "share_first_better": 0.0
+      "share_first_better": 0.3543
     },
     "insufficient_rate": {
-      "mean_difference": 0.0,
+      "mean_difference": -0.03666666666666667,
       "ci95_percentile": [
-        0.0,
-        0.0
+        -0.07333333333333333,
+        -0.0033333333333333335
       ],
-      "share_first_better": 0.0
+      "share_first_better": 0.0168
     }
   }
 }

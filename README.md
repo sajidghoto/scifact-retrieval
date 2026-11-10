@@ -28,6 +28,21 @@ The generation smoke evaluation used `gemini-2.5-flash-lite`, prompt `answer_v1`
 | Hybrid top-5 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 / 0.5000 |
 | BM25 top-5 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 / 0.5000 |
 
+## Full generation workflow (Colab, no API)
+
+1. Export the frozen hybrid and BM25 top-5 contexts and prompts: `python .\scripts\generation\export_prompts.py`. This reads the saved rankings and local SciFact snapshots only; it does not rerun retrieval or write to the database. Upload `data/exports/generation_prompts.jsonl` and `data/exports/generation_prompts.meta.json` in [notebooks/colab_generate.ipynb](notebooks/colab_generate.ipynb).
+2. In Colab, select a free T4 GPU, run the cells in order, and enter `QWEN_MODEL_ID` when prompted. Recommended: `Qwen/Qwen3-4B` (about 8 GB of fp16 weights, leaving room on a 16 GB T4 for runtime and generation memory); fallback: `Qwen/Qwen3-1.7B` (about 3.4 GB of fp16 weights). These public model repos do not require a Hugging Face token. The notebook disables thinking in the chat template, checks deterministic output, prints three prompt/output examples, then writes resumable 50-prompt segments and downloads `generations.jsonl` plus `generations_meta.json`.
+3. Validate without writing, then import idempotently into the test generation cache:
+   ```powershell
+   python .\scripts\generation\import_generations.py --dry-run
+   python .\scripts\generation\import_generations.py
+   ```
+4. Evaluate only the imported cache (no API calls). Copy the `model_id@revision_hash` value from the metadata and provide it to prevent ambiguity when multiple model runs are cached:
+   ```powershell
+   python .\scripts\eval\run_generation_eval.py --cache-only --run test --model "Qwen/Qwen3-4B@<revision_hash>"
+   ```
+   The evaluator writes the existing deterministic metric report and paired hybrid-versus-BM25 bootstrap intervals.
+
 ## Architecture
 
 ```mermaid
