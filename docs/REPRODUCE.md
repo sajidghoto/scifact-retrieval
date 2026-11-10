@@ -1,111 +1,125 @@
-# Reproduce
+# Reproduce the SciFact experiments
 
-All commands run from the repository root. Do not commit `.env`, API keys, raw data, generated exports, caches, or embedding arrays.
+This guide is the end-to-end Windows PowerShell path from a fresh clone through retrieval and the full Qwen answer evaluation. Run commands from the repository root unless stated otherwise. The raw SciFact files, embeddings, frozen hybrid configuration, train candidate cache, and retrieval result files are included in the repository. The Qwen generation outputs are produced separately in Colab and are not included.
 
-## Environment and database
+## 1. Clone and set up Python
 
-Windows PowerShell:
+Install Git, Python, and Docker Desktop first. Start Docker Desktop, then:
 
 ```powershell
-Copy-Item .env.example .env
+git clone https://github.com/sajidghoto/scifact-retrieval.git
+Set-Location .\scifact-retrieval
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r backend\requirements.txt
+Copy-Item .env.example .env
+```
+
+If PowerShell blocks environment activation, run `Set-ExecutionPolicy -Scope Process Bypass` in that terminal and activate again. `.env.example` contains local database defaults; keep `.env` private and set a different database password if needed.
+
+## 2. Create and populate the database
+
+```powershell
 docker compose up -d db
 docker compose exec db psql -U scifact -d scifact -c "CREATE EXTENSION IF NOT EXISTS vector;"
 alembic -c backend\alembic.ini upgrade head
+python .\scripts\ingest\ingest_scifact.py
 ```
 
-Unix shell:
-
-```bash
-cp .env.example .env
-python -m pip install -r backend/requirements.txt
-docker compose up -d db
-docker compose exec db psql -U scifact -d scifact -c "CREATE EXTENSION IF NOT EXISTS vector;"
-alembic -c backend/alembic.ini upgrade head
-```
-
-The migration command writes schema state to the local database.
-
-## Ingest and integrity
+Ingestion loads the bundled SciFact corpus, queries, relevance judgments (qrels), and 256-token chunks with 64-token overlap. Check the imported data:
 
 ```powershell
-python .\scripts\ingest\ingest_scifact.py
 python .\scripts\verify\check_db.py
 ```
 
-```bash
-python ./scripts/ingest/ingest_scifact.py
-python ./scripts/verify/check_db.py
-```
+## 3. Import the included embeddings
 
-Ingestion writes documents, queries, qrels, and chunks to PostgreSQL. The integrity check is read-only and writes no file.
-
-## Embeddings
-
-Export chunks locally:
-
-```powershell
-python .\scripts\embed\export_chunks.py --help
-python .\scripts\embed\export_chunks.py
-```
-
-```bash
-python ./scripts/embed/export_chunks.py --help
-python ./scripts/embed/export_chunks.py
-```
-
-Upload the generated `chunks.parquet` or `chunks.jsonl` and `chunks.meta.json` to [notebooks/colab_embed.ipynb](../notebooks/colab_embed.ipynb), run it on a Colab T4, and download `embeddings.npy`, `ids.npy`, and `embeddings_meta.json`. This is the only embedding-generation step described here; it is not run by this documentation.
-
-Validate without writing:
+The repository includes embeddings generated with `BAAI/bge-base-en-v1.5` (768 dimensions), so Colab embedding generation is not needed to reproduce the reported retrieval run. Validate and then import them:
 
 ```powershell
 python .\scripts\embed\import_embeddings.py --embeddings .\embeddings.npy --ids .\ids.npy --metadata .\embeddings_meta.json --dry-run
-python .\scripts\embed\parity_check.py --help
+python .\scripts\embed\import_embeddings.py --embeddings .\embeddings.npy --ids .\ids.npy --metadata .\embeddings_meta.json
 ```
 
-```bash
-python ./scripts/embed/import_embeddings.py --embeddings ./embeddings.npy --ids ./ids.npy --metadata ./embeddings_meta.json --dry-run
-python ./scripts/embed/parity_check.py --help
+To independently check a sample against the local embedding model, run:
+
+```powershell
+python .\scripts\embed\parity_check.py
 ```
 
-The import dry run writes no database changes; omitting `--dry-run` imports previously empty rows. The parity check is read-only and loads the model, so it is intentionally not run during documentation verification.
+Optional: regenerate embeddings by exporting chunks with `python .\scripts\embed\export_chunks.py`, following [notebooks/colab_embed.ipynb](../notebooks/colab_embed.ipynb), and importing the downloaded arrays using the same dry-run/import commands with their filenames. This requires a Colab GPU and downloads the embedding model.
 
-## Retrieval evaluation
+## 4. Reproduce retrieval and statistical results
 
-Each command writes a summary and per-query JSON under `results/`. The exact output names are `eval_bm25_default.json` and `per_query_bm25_default.json` for BM25, `eval_vector_prefix.json` and `per_query_vector_prefix.json` for prefixed vector retrieval, `eval_vector_no_prefix.json` and `per_query_vector_no_prefix.json` for no-prefix vector retrieval, and `eval_hybrid_frozen.json` and `per_query_hybrid_frozen.json` for the frozen hybrid run:
+The experiment tunes fusion on the 809 train queries and evaluates the selected configuration once on the separate 300-query test split. The committed train candidate cache lets you rerun tuning without recomputing train retrieval:
+
+```powershell
+python .\scripts\eval\tune_hybrid.py --config .\config\hybrid_reproduced.json
+```
+
+The selected method, alpha, and depth should match [`config/hybrid_final.json`](../config/hybrid_final.json). The command writes the tuning tables under `results\` and the separate `hybrid_reproduced.json`, leaving the committed frozen configuration unchanged.
+
+Run each test evaluation (vector modes load the sentence-transformer query model):
 
 ```powershell
 python .\scripts\eval\run_eval.py --retriever bm25
 python .\scripts\eval\run_eval.py --retriever vector
 python .\scripts\eval\run_eval.py --retriever vector --no-query-prefix
-python .\scripts\eval\run_eval.py --retriever hybrid --config .\config\hybrid_final.json
+python .\scripts\eval\run_eval.py --retriever hybrid --config .\config\hybrid_reproduced.json
+python .\scripts\eval\bootstrap.py
 ```
 
-```bash
-python ./scripts/eval/run_eval.py --retriever bm25
-python ./scripts/eval/run_eval.py --retriever vector
-python ./scripts/eval/run_eval.py --retriever vector --no-query-prefix
-python ./scripts/eval/run_eval.py --retriever hybrid --config ./config/hybrid_final.json
-```
+Reports and per-query rankings are written under `results\`. Bootstrap uses 10,000 paired query resamples with seed `20261103`. Do not tune against the test qrels.
 
-The evaluated protocol is train-only tuning on 809 queries followed by one frozen 300-query test run. These commands load retrieval models where required and were not run for this documentation task.
-
-## Bootstrap and generation
+To independently regenerate the train candidate cache rather than using the committed one, choose a new output path and then tune from it:
 
 ```powershell
-python .\scripts\eval\bootstrap.py --help
-python .\scripts\eval\bootstrap.py
-python .\scripts\eval\run_generation_eval.py --limit 5 --dry-run --run smoke
+python .\scripts\eval\cache_train_candidates.py --cache .\results\cache\train_candidates_rebuilt.json
+python .\scripts\eval\tune_hybrid.py --cache .\results\cache\train_candidates_rebuilt.json --config .\config\hybrid_reproduced.json
 ```
 
-```bash
-python ./scripts/eval/bootstrap.py --help
-python ./scripts/eval/bootstrap.py
-python ./scripts/eval/run_generation_eval.py --limit 5 --dry-run --run smoke
+This step embeds train queries and searches the database; it may take a while. It does not use test qrels for tuning.
+
+## 5. Generate Qwen answer prompts
+
+After the test BM25 and hybrid commands have produced their per-query rankings, export the 600 prompts (300 test queries x 2 retrievers):
+
+```powershell
+python .\scripts\generation\export_prompts.py
 ```
 
-Bootstrap writes `results/bootstrap_test.json` and `results/bootstrap_test.md`. Generation writes `results/generation_eval.json` and `results/generation_eval.md`; a non-dry run requires `GEMINI_API_KEY` and `GEMINI_MODEL`. No generation or evaluation was run to produce this documentation.
+Upload both `data\exports\generation_prompts.jsonl` and `data\exports\generation_prompts.meta.json` to [notebooks/colab_generate.ipynb](../notebooks/colab_generate.ipynb). In Colab, select a T4 GPU, run the notebook cells in order, and enter `Qwen/Qwen3-4B` when prompted. The notebook verifies prompt checksums and output keys, saves resumable segments, and downloads `generations.jsonl` and `generations_meta.json`.
 
-## Verification performed
+Copy both downloaded files into `data\exports\` in the cloned repository. Keep the metadata file: it records the exact Hugging Face model revision and runtime details used.
 
-The command interfaces were verified by inspecting their argument parsers and using `--help` or a dry-run form where it does not load a model or call Gemini. Long-running ingestion, embedding, retrieval evaluation, bootstrap, and generation jobs were not run.
+## 6. Validate, import, and evaluate Qwen outputs
+
+```powershell
+python .\scripts\generation\import_generations.py --dry-run
+python .\scripts\generation\import_generations.py
+```
+
+Copy `model_id` and `revision_hash` from `data\exports\generations_meta.json` into the model argument:
+
+```powershell
+python .\scripts\eval\run_generation_eval.py --cache-only --run test --model "Qwen/Qwen3-4B@<revision_hash>"
+```
+
+`--cache-only` makes no API calls. The command writes `results\generation_eval.json` and `results\generation_eval.md`; inspect those reports for the answer quality metrics. The cache and Colab output files are local artifacts, not tracked experiment inputs.
+
+## What the experiment measures
+
+- **BM25:** lexical retrieval baseline.
+- **Vector:** exact cosine retrieval using BGE chunk embeddings and maximum chunk similarity; the default query includes the documented retrieval prefix. The no-prefix run isolates that choice.
+- **Hybrid:** min-max normalized BM25 and vector scores combined with train-selected weighted fusion (alpha 0.7, depth 50).
+- **Generation:** Qwen answers from each retriever’s top-five documents, evaluated with deterministic validity, grounding, citation, and abstention metrics. It is not a human evaluation.
+
+See [EVALUATION.md](EVALUATION.md) for dataset counts, metric definitions, results, and limitations; [DECISIONS.md](DECISIONS.md) for design choices.
+
+## Reproducibility notes
+
+- `backend/requirements.txt` uses unpinned dependencies. For closer environment matching, record Python, package, PostgreSQL, Colab runtime, and GPU versions.
+- The Qwen notebook records the resolved model revision and library versions in `generations_meta.json`. Model/runtime changes can affect generated text even when the prompts are unchanged.
+- `.env`, downloaded Colab outputs, prompt exports, and generation caches should remain local and should not be committed.
+- Run the automated tests with `python -m pytest`.

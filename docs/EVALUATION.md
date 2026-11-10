@@ -2,7 +2,7 @@
 
 ## Question and scope
 
-This report asks whether lexical BM25, exact vector retrieval, and frozen weighted fusion retrieve SciFact evidence under a reproducible local protocol. It also records a deterministic smoke evaluation of answers generated from retrieved top-five contexts. The results do not evaluate production deployment, other datasets, scale, or human judgments.
+This report asks whether lexical BM25, exact vector retrieval, and frozen weighted fusion retrieve SciFact evidence under a reproducible local protocol. It also records the full deterministic evaluation of answers generated from retrieved top-five contexts. The results do not evaluate production deployment, other datasets, scale, or human judgments.
 
 ## Data
 
@@ -93,19 +93,19 @@ Counts below use saved top-10 results for the 300 test queries.
 
 ## Generation evaluation
 
-The generation task asks a model to return JSON containing a verdict, context document IDs, and a rationale of at most 60 words, using only the supplied abstracts. Prompt version `answer_v1` uses model `gemini-2.5-flash-lite`; the checked-in run has 5 queries and 0 API calls because answers were cached.
+The generation task asks a model to return JSON containing a verdict, context document IDs, and a rationale of at most 60 words, using only the supplied abstracts. Prompt version `answer_v1` was evaluated with `Qwen/Qwen3-4B` at revision `1cfa9a7208912126459214e8b04321603b3df60c`. It covers all 300 test queries for each of the hybrid and BM25 top-five contexts (600 outputs total); the imported cache was evaluated with zero API calls.
 
-| Context | Queries | Validity | Grounding | Citation precision | Citation recall | Failures |
-|---|---:|---:|---:|---:|---:|---:|
-| Hybrid top-5 | 5 | 5/5 (1.0000) | 5/5 (1.0000) | 1/1 (1.0000) | 1/1 (1.0000) | 0 |
-| BM25 top-5 | 5 | 5/5 (1.0000) | 5/5 (1.0000) | 1/1 (1.0000) | 1/1 (1.0000) | 0 |
+| Context | Queries | Validity | Grounding | Citation precision | Citation recall | Relevant citation rate | Failures |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Hybrid top-5 | 300 | 299/300 (0.9967) | 299/300 (0.9967) | 0.6870 (n=256) | 0.7745 (n=256) | 205/256 (0.8008) | 1 |
+| BM25 top-5 | 300 | 299/300 (0.9967) | 299/300 (0.9967) | 0.6893 (n=245) | 0.7406 (n=245) | 189/245 (0.7714) | 1 |
 
 | Context | No relevant document in top-5: queries / insufficient / rate | Relevant document in top-5: queries / insufficient / rate |
 |---|---|---|
-| Hybrid | 3 / 3 / 1.0000 | 2 / 1 / 0.5000 |
-| BM25 | 3 / 3 / 1.0000 | 2 / 1 / 0.5000 |
+| Hybrid | 49 / 16 / 0.3265 | 251 / 27 / 0.1076 |
+| BM25 | 76 / 34 / 0.4474 | 224 / 20 / 0.0893 |
 
-Citation precision and recall are averaged only over answers that contain citations. Verdict labels were available in the cached records; verdict accuracy was not evaluated because no independent verdict labels were provided.
+Citation precision and recall, and relevant citation rate, are computed only over answers containing citations. The validity and grounding denominator is 300 and includes one failed output for each context. Verdict accuracy was not evaluated because no independent verdict labels were provided. The full machine-readable results and examples are in [`results/generation_eval.md`](../results/generation_eval.md).
 
 Examples, quoted verbatim from `results/generation_eval.md`:
 
@@ -119,7 +119,7 @@ Examples, quoted verbatim from `results/generation_eval.md`:
 - Results cover one SciFact version, one local corpus, and one 300-query test split.
 - Train tuning and the final test run are separate, but the test set is small.
 - Exact search and a single-node database do not establish deployment-scale behavior.
-- Generation results are a five-query deterministic smoke evaluation with no human or independent verdict accuracy assessment.
+- Generation scores come from one model revision on 300 test queries, without human assessment or independent verdict-accuracy labels.
 
 
 ## Reproduction

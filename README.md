@@ -21,27 +21,18 @@ Hybrid parameters were tuned on the train split only (809 queries), followed by 
 | Hybrid minus vector, nDCG@10 | 0.0186 | [0.0044, 0.0333] |
 | Hybrid minus BM25, nDCG@10 | 0.0968 | [0.0644, 0.1296] |
 
-The generation smoke evaluation used `gemini-2.5-flash-lite`, prompt `answer_v1`, and 5 queries.
+The full answer evaluation used `Qwen/Qwen3-4B` revision `1cfa9a7208912126459214e8b04321603b3df60c`, prompt `answer_v1`, and 300 test queries per retriever (600 outputs total). One output per retriever failed validation.
 
-| Context | Validity | Grounding | Citation precision | Citation recall | Abstention when relevant absent/present |
+| Context | Validity | Grounding | Citation precision | Citation recall | Abstention when relevant absent / present |
 |---|---:|---:|---:|---:|---:|
-| Hybrid top-5 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 / 0.5000 |
-| BM25 top-5 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 / 0.5000 |
+| Hybrid top-5 | 299/300 | 299/300 | 0.6870 (256) | 0.7745 (256) | 0.3265 / 0.1076 |
+| BM25 top-5 | 299/300 | 299/300 | 0.6893 (245) | 0.7406 (245) | 0.4474 / 0.0893 |
 
-## Full generation workflow (Colab, no API)
+Citation metrics use only answers containing citations; abstention rates are reported when a relevant document is absent from / present in the top five. See [`results/generation_eval.md`](results/generation_eval.md) for all metrics and examples, and [docs/EVALUATION.md](docs/EVALUATION.md) for interpretation and limitations.
 
-1. Export the frozen hybrid and BM25 top-5 contexts and prompts: `python .\scripts\generation\export_prompts.py`. This reads the saved rankings and local SciFact snapshots only; it does not rerun retrieval or write to the database. Upload `data/exports/generation_prompts.jsonl` and `data/exports/generation_prompts.meta.json` in [notebooks/colab_generate.ipynb](notebooks/colab_generate.ipynb).
-2. In Colab, select a free T4 GPU, run the cells in order, and enter `QWEN_MODEL_ID` when prompted. Recommended: `Qwen/Qwen3-4B` (about 8 GB of fp16 weights, leaving room on a 16 GB T4 for runtime and generation memory); fallback: `Qwen/Qwen3-1.7B` (about 3.4 GB of fp16 weights). These public model repos do not require a Hugging Face token. The notebook disables thinking in the chat template, checks deterministic output, prints three prompt/output examples, then writes resumable 50-prompt segments and downloads `generations.jsonl` plus `generations_meta.json`.
-3. Validate without writing, then import idempotently into the test generation cache:
-   ```powershell
-   python .\scripts\generation\import_generations.py --dry-run
-   python .\scripts\generation\import_generations.py
-   ```
-4. Evaluate only the imported cache (no API calls). Copy the `model_id@revision_hash` value from the metadata and provide it to prevent ambiguity when multiple model runs are cached:
-   ```powershell
-   python .\scripts\eval\run_generation_eval.py --cache-only --run test --model "Qwen/Qwen3-4B@<revision_hash>"
-   ```
-   The evaluator writes the existing deterministic metric report and paired hybrid-versus-BM25 bootstrap intervals.
+## Reproduce the experiment
+
+The complete fresh-clone procedure covers database setup, importing the included embeddings, train-only hybrid tuning, test retrieval evaluation, and the optional 600-prompt Qwen/Colab evaluation. Follow [docs/REPRODUCE.md](docs/REPRODUCE.md); it also explains which outputs are local and how to interpret the experiment.
 
 ## Architecture
 
@@ -67,14 +58,7 @@ flowchart LR
 
 ## Quickstart
 
-1. Copy `.env.example` to `.env` and set the local database values.
-2. Run `docker compose up -d db`.
-3. Run `alembic -c backend\alembic.ini upgrade head`.
-4. Run `python .\scripts\ingest\ingest_scifact.py`.
-5. Import the Colab-produced embeddings as described in [docs/REPRODUCE.md](docs/REPRODUCE.md).
-6. Run `python .\scripts\eval\run_eval.py --retriever hybrid --config .\config\hybrid_final.json`.
-
-The full procedure and command verification are in [docs/REPRODUCE.md](docs/REPRODUCE.md).
+Start with [docs/REPRODUCE.md](docs/REPRODUCE.md) for the full setup and experiment steps. The repository includes the embedding arrays; generating new ones in Colab is optional.
 
 ## Repository layout
 
@@ -104,7 +88,7 @@ tests/         Automated tests
 - SciFact abstracts are short; 1,005 of 5,183 documents have at least two chunks, so chunking effects are limited here.
 - The system is single-node and has no hosted deployment.
 - The retrieval intervals are based on one fixed test set; see the full bootstrap table in the evaluation report.
-- Generation uses deterministic metrics only and a 5-query smoke evaluation.
+- Generation uses one Qwen model revision and has no human evaluation or independent verdict-accuracy labels.
 
 ## Acknowledgements and licenses
 
