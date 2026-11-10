@@ -12,7 +12,7 @@ Keep this file as concise, current project memory. At the end of work that mater
 - Embeddings: `scripts/embed/embed_chunks.py` uses local `BAAI/bge-base-en-v1.5` vectors with dimension 768; supports `--limit`, `--dry-run`, and `--batch-size`.
 - Colab embedding path exists in `notebooks/colab_embed.ipynb`; full embedding/import remains pending.
 - Vector retriever and retriever-agnostic evaluation are implemented and measured: prefix vector recall@10 0.8780, recall@100 0.9683, MRR@10 0.7016, nDCG@10 0.7405; no-prefix recall@10 0.8619, recall@100 0.9733, MRR@10 0.7088, nDCG@10 0.7430.
-- Tests: 42 tests pass, including API failure handling, cached BM25 parity, chunking, BM25, embedding, metrics, bootstrap, fusion, hybrid composition, and vector retrieval tests.
+- Tests: 59 tests pass, including generation export/import validation and cache-only evaluation, generation parsing/retry validation, API failure handling, cached BM25 parity, chunking, BM25, embedding, metrics, bootstrap, fusion, hybrid composition, and vector retrieval tests.
 - API vector mode loads the model lazily once per process, BM25 is indexed lazily once per process, and `SCIFACT_PRELOAD=true` enables startup preload with `/ready` reporting completion; model and database failures are logged with specific 503 details.
 - API measurements use Python `http.client` and refreshed `psutil` RSS from the actual worker: lazy RSS 77.01/883.87/958.91 MB (startup/first-vector/20-mixed), peak 965.23 MB; preload RSS 944.79/949.71/958.43 MB, peak 965.61 MB. Lazy BM25/vector/hybrid p50/p95 were 28.83/42.06, 132.98/164.69, and 156.95/223.00 ms; preload values were 27.01/40.33, 177.64/221.29, and 200.43/260.88 ms.
 - Evaluation reports contain separate query-embedding, DB-search, and total latency p50/p95 values; the README table reflects those fields.
@@ -22,6 +22,7 @@ Keep this file as concise, current project memory. At the end of work that mater
 - Train-only hybrid scores: weighted alpha 0.7 at depth 50 gives recall@10 0.8936, recall@100 0.9615, MRR@10 0.7452, and nDCG@10 0.7757.
 - Final hybrid test scores: 300 queries, recall@10 0.8963, recall@100 0.9617, MRR@10 0.7233, nDCG@10 0.7590; latency p50/p95 138.58/219.80 ms.
 - Hybrid per-query results were regenerated after a missing output-row bug; quality metrics matched the original run to four decimals.
+- Evidence-grounded generation supports a Colab Qwen3 path that exports the frozen top-5 prompts, imports raw outputs into the model/revision-keyed cache, and evaluates cache-only without API calls; the 600-output run remains pending.
 
 ## Decisions
 
@@ -32,7 +33,7 @@ Keep this file as concise, current project memory. At the end of work that mater
 
 ## Next steps
 
-1. Use the saved bootstrap and hybrid failure-analysis results for comparison.
+1. Export the 600 generation prompts, run the Colab Qwen3 generation workflow, import the outputs, then evaluate the cache with `--cache-only`.
 
 ## Useful commands
 
