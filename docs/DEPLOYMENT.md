@@ -19,7 +19,18 @@ The measured peak RSS establishes a local memory floor near 965.61 MB for the te
 
 ## Local run
 
-Create `.env` from `.env.example` and keep credentials there. Relevant variables are:
+This runs the local API and web UI on Windows with PowerShell. Install Python, Node.js/npm, and Docker Desktop, and start Docker Desktop first. Run commands from the repository root unless noted otherwise.
+
+Create and activate a Python environment, install the backend dependencies, and create the local environment file:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend\requirements.txt
+Copy-Item .env.example .env
+```
+
+If PowerShell blocks environment activation, run `Set-ExecutionPolicy -Scope Process Bypass` in that terminal and activate again. Keep `.env` private; if you change the example database password, update it in both `POSTGRES_PASSWORD` and `DATABASE_URL`. The relevant variables are:
 
 - `DATABASE_URL`
 - `POSTGRES_PASSWORD`
@@ -27,12 +38,33 @@ Create `.env` from `.env.example` and keep credentials there. Relevant variables
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL`
 
-Start PostgreSQL and the API:
+Start PostgreSQL, create the vector extension, apply the schema, and ingest the bundled SciFact data:
 
 ```powershell
 docker compose up -d db
 docker compose exec db psql -U scifact -d scifact -c "CREATE EXTENSION IF NOT EXISTS vector;"
-uvicorn app.main:app --app-dir backend
+alembic -c backend\alembic.ini upgrade head
+python .\scripts\ingest\ingest_scifact.py
 ```
 
-The API exposes `GET /health` for process health and `GET /ready` for preload readiness. `/ready` returns 503 when preload is disabled, incomplete, or failed. Retrieval endpoints are documented in the repository source and require the local database.
+To enable vector and hybrid search, also import the embeddings included in the repository:
+
+```powershell
+python .\scripts\embed\import_embeddings.py --embeddings .\embeddings.npy --ids .\ids.npy --metadata .\embeddings_meta.json
+```
+
+Start the backend in one terminal:
+
+```powershell
+uvicorn app.main:app --app-dir backend --reload
+```
+
+In a second terminal, install and start the frontend:
+
+```powershell
+Set-Location .\frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to search or generate an answer from the top five retrieved documents. The frontend defaults to the API at `http://localhost:8000`; set `NEXT_PUBLIC_API_URL` before starting Next.js if the API runs elsewhere. Answer generation requires `GEMINI_API_KEY` and `GEMINI_MODEL` in the backend `.env`; credentials are never sent to the frontend. The API exposes `GET /health` for process health, `GET /ready` for preload readiness, and interactive endpoint documentation at [http://localhost:8000/docs](http://localhost:8000/docs). `/ready` returns 503 when preload is disabled, incomplete, or failed. BM25 search works after ingestion; vector and hybrid modes require the embedding import and download the query embedding model on first use.
