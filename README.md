@@ -56,9 +56,11 @@ flowchart LR
 - `scripts/eval/`: retrieval, bootstrap, tuning, and generation evaluation.
 - `results/`: checked-in evaluation evidence and failure analysis.
 
-## Quickstart
+## Run locally
 
-Start with [docs/REPRODUCE.md](docs/REPRODUCE.md) for the full setup and experiment steps. The repository includes the embedding arrays; generating new ones in Colab is optional.
+To run the search application, follow [the local setup and run instructions](docs/DEPLOYMENT.md). In brief, you will need Python, Node.js/npm, and Docker Desktop: create the Python environment, start and populate PostgreSQL, then run the FastAPI backend and Next.js frontend in separate terminals. The bundled embeddings are needed for vector and hybrid search; BM25 can run without importing them.
+
+For the full experiment reproduction—including retrieval evaluation and optional Qwen answer generation—see [docs/REPRODUCE.md](docs/REPRODUCE.md).
 
 ## Repository layout
 

@@ -91,3 +91,79 @@ def test_vector_database_failure_is_logged_and_specific(monkeypatch, caplog):
     assert raised.value.status_code == 503
     assert "database unavailable" in raised.value.detail
     assert "Vector retrieval database failure" in caplog.text
+
+
+def test_generate_uses_top_five_retrieved_documents(monkeypatch):
+    results = [
+        main.SearchResult(
+            doc_id=f"d{index}",
+            title=f"Title {index}",
+            text=f"Evidence {index}",
+            score=1.0,
+        )
+        for index in range(5)
+    ]
+
+    def retrieve(**kwargs):
+        assert kwargs["limit"] == 5
+        assert kwargs["mode"] == "hybrid"
+        return main.SearchResponse(query="claim", mode="hybrid", results=results)
+
+    monkeypatch.setattr(main, "search_documents", retrieve)
+    prompts = []
+
+    class Client:
+        def generate(self, prompt):
+            prompts.append(prompt)
+            return (
+                '{"verdict":"supports","cited_doc_ids":["d1"],'
+                '"rationale":"Document d1 reports the claimed finding."}'
+            )
+
+    monkeypatch.setattr(main, "create_gemini_client", lambda: Client())
+    response = main.generate_answer(
+        main.GenerateRequest(claim="claim", mode="hybrid"),
+        session=object(),
+    )
+
+    assert response.verdict == "supports"
+    assert response.cited_doc_ids == ["d1"]
+    assert len(response.results) == 5
+    assert "DOCUMENT ID: d1" in prompts[0]
+    assert "DOCUMENT ID: d5" not in prompts[0]
+
+
+def test_generate_rejects_citations_outside_retrieved_context(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "search_documents",
+        lambda **_kwargs: main.SearchResponse(
+            query="claim",
+            mode="bm25",
+            results=[
+                main.SearchResult(
+                    doc_id="d1",
+                    title="Title",
+                    text="Evidence",
+                    score=1.0,
+                )
+            ],
+        ),
+    )
+
+    class Client:
+        def generate(self, _prompt):
+            return (
+                '{"verdict":"supports","cited_doc_ids":["unknown"],'
+                '"rationale":"The evidence supports the claim."}'
+            )
+
+    monkeypatch.setattr(main, "create_gemini_client", lambda: Client())
+    with pytest.raises(HTTPException) as raised:
+        main.generate_answer(
+            main.GenerateRequest(claim="claim"),
+            session=object(),
+        )
+
+    assert raised.value.status_code == 502
+    assert "outside the context" in raised.value.detail

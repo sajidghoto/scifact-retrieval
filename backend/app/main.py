@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -19,6 +19,14 @@ from app.db.models import Chunk, Document
 from app.retrieval import BM25, DocumentRecord
 from app.vector_retrieval import VectorRetriever
 from app.hybrid_retrieval import HybridRetriever
+from app.generation import (
+    EvidenceDocument,
+    GenerationError,
+    QuotaExhaustedError,
+    build_prompt,
+    create_gemini_client,
+    parse_response,
+)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT_DIR))
@@ -53,7 +61,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -70,6 +78,28 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     mode: str
+    results: list[SearchResult]
+
+
+class GenerateRequest(BaseModel):
+    claim: str = Field(min_length=1, max_length=500)
+    mode: Literal["bm25", "vector", "hybrid"] = "bm25"
+
+    @field_validator("claim")
+    @classmethod
+    def claim_must_not_be_blank(cls, value: str) -> str:
+        claim = value.strip()
+        if not claim:
+            raise ValueError("claim must not be blank")
+        return claim
+
+
+class GenerateResponse(BaseModel):
+    claim: str
+    mode: Literal["bm25", "vector", "hybrid"]
+    verdict: Literal["supports", "contradicts", "insufficient"]
+    cited_doc_ids: list[str]
+    rationale: str
     results: list[SearchResult]
 
 
@@ -289,3 +319,49 @@ def search_documents(
         for doc_id, score in scores.items()
     ]
     return SearchResponse(query=query, mode=mode, results=results)
+
+
+@app.post("/generate", response_model=GenerateResponse, tags=["Generation"])
+def generate_answer(
+    request: GenerateRequest,
+    session: DatabaseSession,
+) -> GenerateResponse:
+    """Generate a validated, evidence-grounded answer from the top five results."""
+    search = search_documents(
+        session=session,
+        query=request.claim,
+        limit=5,
+        mode=request.mode,
+    )
+    evidence = [
+        EvidenceDocument(result.doc_id, result.title, result.text)
+        for result in search.results
+    ]
+    try:
+        prompt = build_prompt(request.claim, evidence)
+        raw_response = create_gemini_client().generate(prompt)
+        answer = parse_response(raw_response, {document.doc_id for document in evidence})
+    except QuotaExhaustedError as error:
+        logger.warning("Answer generation quota exhausted: %s", error)
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except GenerationError as error:
+        logger.exception("Answer generation failed: %s", error)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Answer generation failed: {error}",
+        ) from error
+    except (ImportError, RuntimeError) as error:
+        logger.error("Answer generation is unavailable: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Answer generation is unavailable: {error}",
+        ) from error
+
+    return GenerateResponse(
+        claim=request.claim,
+        mode=request.mode,
+        verdict=answer.verdict,
+        cited_doc_ids=answer.cited_doc_ids,
+        rationale=answer.rationale,
+        results=search.results,
+    )
